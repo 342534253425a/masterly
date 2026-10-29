@@ -16,3 +16,5 @@ playwright-report
 test-results
 infra/terraform/**/.terraform
 infra/terraform/**/*.tfstate*
+
+.vercel
