@@ -32,6 +32,7 @@ export function FiltersPanel({ facets, className }: { facets?: Facets; className
   const { data: brands } = useQuery(catalogQueries.brands());
   const { data: models } = useQuery({ ...catalogQueries.models(filters.brand ?? undefined), enabled: Boolean(filters.brand) });
   const [locating, setLocating] = useState(false);
+  const [allServices, setAllServices] = useState(false);
   const counts = new Map(facets?.services.map((s) => [s.id, s.count]));
   const histogram = facets?.priceHistogram ?? [];
   const maxPrice = Math.max(5000, ...histogram.map((b) => b.to));
@@ -75,7 +76,8 @@ export function FiltersPanel({ facets, className }: { facets?: Facets; className
         }
       >
         <div className="flex flex-col gap-1">
-          {services?.map((service) => {
+          {/* Длинный справочник сворачиваем: выбранная услуга всегда видна */}
+          {services?.filter((service, index) => allServices || index < 6 || filters.service === service.slug).map((service) => {
             const active = filters.service === service.slug;
             const count = counts.get(service.id);
             return (
@@ -95,6 +97,11 @@ export function FiltersPanel({ facets, className }: { facets?: Facets; className
               </button>
             );
           })}
+          {services && services.length > 6 ? (
+            <button type="button" onClick={() => setAllServices((value) => !value)} className="mt-1 rounded-xl px-2.5 py-1.5 text-left text-[13px] font-semibold text-accent hover:bg-surface-2 dark:text-accent-2">
+              {allServices ? t('filters.collapse') : t('filters.allServices', { count: services.length })}
+            </button>
+          ) : null}
         </div>
       </Section>
 

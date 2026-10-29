@@ -112,6 +112,12 @@ export function toMasterCard(master: MasterFixture, ctx: CardContext = {}): Mast
     price: ctx.serviceId && range ? { serviceId: ctx.serviceId, modelId: ctx.model?.id ?? null, range } : null,
     serviceIds: effectiveServiceIds(master),
     photosCount: master.photos.length,
+    gallery: master.photos.slice(0, 6).map((photo) => ({ id: photo.id, serviceId: photo.serviceId, caption: photo.caption })),
+    offersPreview: offersOf(master)
+      .filter((offer) => offer.priceFrom > 0)
+      .sort((a, b) => (serviceById.get(b.serviceId)?.demand ?? 0) - (serviceById.get(a.serviceId)?.demand ?? 0))
+      .slice(0, 3)
+      .map((offer) => ({ serviceId: offer.serviceId, priceFrom: offer.priceFrom })),
   };
 }
 

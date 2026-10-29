@@ -16,7 +16,21 @@ import { Button, buttonVariants, Popover, PopoverContent, PopoverTrigger, toast 
  * Контролируемое раскрытие контактов: только для вошедших, с лимитом и журналированием
  * (защита мастеров от спама и скрейпинга; метрика «переходы к контактам» в кабинете).
  */
-export function RevealContactsButton({ masterId, phoneMasked, className }: { masterId: string; phoneMasked: string; className?: string }) {
+export function RevealContactsButton({
+  masterId,
+  phoneMasked,
+  className,
+  size = 'lg',
+  compact = false,
+}: {
+  masterId: string;
+  /** Без маски (карточка выдачи) кнопка подписана «Показать телефон». */
+  phoneMasked?: string;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  /** В карточке выдачи раскрытый номер — одна кнопка-ссылка tel:, без блока с мессенджерами. */
+  compact?: boolean;
+}) {
   const t = useTranslations();
   const { isAuthenticated } = useSession();
   const pathname = usePathname();
@@ -29,6 +43,15 @@ export function RevealContactsButton({ masterId, phoneMasked, className }: { mas
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
+
+  if (contacts && compact) {
+    return (
+      <a href={`tel:${contacts.phone.replace(/[^\d+]/g, '')}`} className={cn(buttonVariants({ variant: 'soft', size }), 'tabular-nums', className)}>
+        <Phone />
+        {contacts.phone}
+      </a>
+    );
+  }
 
   if (contacts) {
     return (
@@ -58,9 +81,9 @@ export function RevealContactsButton({ masterId, phoneMasked, className }: { mas
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="secondary" size="lg" className={cn('w-full', className)}>
+          <Button variant="secondary" size={size} className={cn(!compact && 'w-full', className)}>
             <Phone />
-            {phoneMasked}
+            {phoneMasked ?? t('master.showPhone')}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="center" className="w-72 p-4">
@@ -74,14 +97,14 @@ export function RevealContactsButton({ masterId, phoneMasked, className }: { mas
   }
 
   return (
-    <Button variant="secondary" size="lg" className={cn('w-full', className)} loading={reveal.isPending} onClick={() => reveal.mutate()}>
+    <Button variant="secondary" size={size} className={cn(!compact && 'w-full', className)} loading={reveal.isPending} onClick={() => reveal.mutate()}>
       <Phone />
       {t('master.showPhone')}
     </Button>
   );
 }
 
-export function WriteToMasterButton({ masterId, leadId = null, className, size = 'lg' }: { masterId: string; leadId?: string | null; className?: string; size?: 'md' | 'lg' }) {
+export function WriteToMasterButton({ masterId, leadId = null, className, size = 'lg', compact = false }: { masterId: string; leadId?: string | null; className?: string; size?: 'sm' | 'md' | 'lg'; compact?: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -95,7 +118,7 @@ export function WriteToMasterButton({ masterId, leadId = null, className, size =
     <Button
       variant="secondary"
       size={size}
-      className={cn('w-full', className)}
+      className={cn(!compact && 'w-full', className)}
       loading={start.isPending}
       onClick={() => (isAuthenticated ? start.mutate() : router.push(routes.login(pathname)))}
     >

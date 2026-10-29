@@ -1,7 +1,7 @@
 import { Star } from 'lucide-react';
-import { cn, formatCompact } from '@/shared/lib';
+import { cn, formatPrice } from '@/shared/lib';
 
-/** Маркер на карте: «пилюля» с ценой, как в референсе; при отдалении — точка. */
+/** Маркер на карте: «пилюля» с ценой (без услуги — рейтинг). Светлая в обеих темах — читается на любой подложке; при отдалении — точка. */
 export function PricePin({ price, rating, active, promoted, compact, locale = 'ru' }: { price: number | null; rating: number; active?: boolean; promoted?: boolean; compact?: boolean; locale?: string }) {
   if (compact) {
     return (
@@ -20,12 +20,12 @@ export function PricePin({ price, rating, active, promoted, compact, locale = 'r
         active
           ? 'z-10 scale-110 border-transparent bg-brand text-white shadow-glow'
           : promoted
-            ? 'border-warning/50 bg-elevated text-fg'
-            : 'border-line-strong bg-elevated text-fg hover:scale-105',
+            ? 'border-amber-400 bg-white text-zinc-900 hover:scale-105'
+            : 'border-black/10 bg-white text-zinc-900 hover:scale-105',
       )}
     >
       {price !== null ? (
-        <>{price === 0 ? '0 ₽' : `${formatCompact(price, locale)} ₽`}</>
+        <>{formatPrice(price, locale)}</>
       ) : (
         <>
           <Star className="size-3 fill-amber-400 text-amber-400" strokeWidth={0} />
@@ -35,7 +35,7 @@ export function PricePin({ price, rating, active, promoted, compact, locale = 'r
       <span
         className={cn(
           'absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-b border-r',
-          active ? 'border-transparent bg-[#8b5cf6]' : promoted ? 'border-warning/50 bg-elevated' : 'border-line-strong bg-elevated',
+          active ? 'border-transparent bg-[#8b5cf6]' : promoted ? 'border-amber-400 bg-white' : 'border-black/10 bg-white',
         )}
       />
     </span>

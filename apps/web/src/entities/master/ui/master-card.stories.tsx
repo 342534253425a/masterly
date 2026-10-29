@@ -36,6 +36,16 @@ const master: MasterCardData = {
   price: { serviceId: 'display', modelId: 'iphone-13', range: { from: 8900, to: 12300 } },
   serviceIds: ['display', 'battery'],
   photosCount: 9,
+  gallery: [
+    { id: 'p1', serviceId: 'display', caption: 'Замена дисплея iPhone 13' },
+    { id: 'p2', serviceId: 'battery', caption: 'Новый аккумулятор Galaxy S22' },
+    { id: 'p3', serviceId: 'camera', caption: 'Камера iPhone 12 Pro' },
+  ],
+  offersPreview: [
+    { serviceId: 'display', priceFrom: 4500 },
+    { serviceId: 'battery', priceFrom: 1900 },
+    { serviceId: 'port', priceFrom: 1500 },
+  ],
 };
 
 const meta = {

@@ -8,12 +8,15 @@ test('клиент находит мастера по описанию проб�
   await expect(page).toHaveURL(/\/search\?/);
   await expect(page.getByText('Мы поняли запрос')).toBeVisible();
 
-  await page.getByRole('article').first().getByRole('link').first().click();
+  await page.getByRole('article').first().getByRole('heading').getByRole('link').click();
+  // h1 есть и на странице поиска — ждём именно перехода в профиль
+  await expect(page).toHaveURL(/\/masters\//);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
   await page.request.post('/api/v1/auth/demo', { data: { role: 'client' } });
   await page.reload();
-  await page.getByRole('button', { name: 'Оставить заявку' }).first().click();
+  // На телефоне кнопка боковой колонки профиля скрыта — нужна видимая
+  await page.getByRole('button', { name: 'Оставить заявку' }).filter({ visible: true }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 

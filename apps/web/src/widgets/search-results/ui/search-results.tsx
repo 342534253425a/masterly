@@ -1,14 +1,16 @@
 'use client';
 
 import type { Interpretation, SearchResponse } from '@masterly/contracts';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { SearchX, Send, Sparkles, Zap } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { CompareToggle } from '@/features/compare-masters';
+import { RevealContactsButton, WriteToMasterButton } from '@/features/contact-master';
 import { useLeadWizard } from '@/features/create-lead';
 import { useSearchFilters } from '@/features/filter-masters';
 import { FavoriteButton } from '@/features/toggle-favorite';
+import { catalogQueries } from '@/entities/catalog';
 import { MasterCard, MasterCardSkeleton, masterQueries } from '@/entities/master';
 import { cn, formatPrice } from '@/shared/lib';
 import { Badge, Button, EmptyState, Progress } from '@/shared/ui';
@@ -19,7 +21,7 @@ function InterpretationBanner({ interpretation }: { interpretation: Interpretati
   const top = interpretation.services[0];
   if (!top && !interpretation.model) return null;
   return (
-    <div className="relative overflow-hidden rounded-3xl border-gradient p-4 sm:p-5">
+    <div className="relative overflow-hidden rounded-3xl border-gradient p-3.5 sm:px-5 sm:py-4">
       <div aria-hidden className="absolute -right-16 -top-16 size-48 rounded-full bg-accent/25 blur-3xl" />
       <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="inline-flex items-center gap-1.5 text-sm font-bold">
@@ -53,12 +55,17 @@ function InterpretationBanner({ interpretation }: { interpretation: Interpretati
   );
 }
 
-/** Выдача: бесконечная прокрутка (keyset-курсоры), SSR первой страницы, слоты фич в карточке. */
-export function SearchResults({ onFirstPage }: { onFirstPage?: (page: SearchResponse) => void }) {
+/**
+ * Выдача: бесконечная прокрутка (keyset-курсоры), SSR первой страницы, слоты фич в карточке.
+ * compact — узкая колонка рядом с большой картой: мини-карточки без кнопок связи.
+ */
+export function SearchResults({ onFirstPage, compact = false }: { onFirstPage?: (page: SearchResponse) => void; compact?: boolean }) {
   const t = useTranslations();
-  const { params, setFilters } = useSearchFilters();
+  const { params, setFilters, city } = useSearchFilters();
   const openWizard = useLeadWizard((s) => s.openWizard);
   const query = useInfiniteQuery(masterQueries.search(params));
+  const { data: services } = useQuery(catalogQueries.services(city));
+  const serviceNames = useMemo(() => new Map(services?.map((service) => [service.id, service.name])), [services]);
   const sentinel = useRef<HTMLDivElement>(null);
   const first = query.data?.pages[0];
 
@@ -81,7 +88,7 @@ export function SearchResults({ onFirstPage }: { onFirstPage?: (page: SearchResp
     return (
       <div className="flex flex-col gap-3">
         {Array.from({ length: 4 }, (_, i) => (
-          <MasterCardSkeleton key={i} />
+          <MasterCardSkeleton key={i} variant={compact ? 'compact' : 'row'} />
         ))}
       </div>
     );
@@ -92,8 +99,8 @@ export function SearchResults({ onFirstPage }: { onFirstPage?: (page: SearchResp
   const service = interpretation?.services[0];
 
   return (
-    <div className={cn('flex flex-col gap-3 transition-opacity duration-300', query.isPlaceholderData && 'opacity-60')}>
-      {interpretation ? <InterpretationBanner interpretation={interpretation} /> : null}
+    <div className={cn('flex flex-col transition-opacity duration-300', compact ? 'gap-2' : 'gap-3', query.isPlaceholderData && 'opacity-60')}>
+      {interpretation && !compact ? <InterpretationBanner interpretation={interpretation} /> : null}
       {items.length === 0 ? (
         <EmptyState
           icon={<SearchX />}
@@ -106,41 +113,44 @@ export function SearchResults({ onFirstPage }: { onFirstPage?: (page: SearchResp
           }
         />
       ) : null}
-      {items.map((master) => (
-        <MasterCard
-          key={master.id}
-          master={master}
-          className="animate-rise"
-          hrefQuery={{ service: params.service, model: params.model }}
-          priceCaption={master.price && (service || params.service) ? [service?.name, interpretation?.model?.name].filter(Boolean).join(' · ') : undefined}
-          topActions={
-            <>
-              <CompareToggle master={master} />
-              <FavoriteButton masterId={master.id} />
-            </>
-          }
-          primaryAction={
-            <Button
-              size="sm"
-              onClick={() =>
-                openWizard({
-                  masterIds: [master.id],
-                  masterNames: [master.name],
-                  serviceId: master.price?.serviceId ?? service?.id ?? null,
-                  modelId: master.price?.modelId ?? interpretation?.model?.id ?? null,
-                  description: params.q,
-                  urgent: interpretation?.urgent,
-                })
-              }
-            >
-              <Send />
-              {t('master.requestShort')}
-            </Button>
-          }
-        />
-      ))}
+      {items.map((master) => {
+        const request = () =>
+          openWizard({
+            masterIds: [master.id],
+            masterNames: [master.name],
+            serviceId: master.price?.serviceId ?? service?.id ?? null,
+            modelId: master.price?.modelId ?? interpretation?.model?.id ?? null,
+            description: params.q,
+            urgent: interpretation?.urgent,
+          });
+        return (
+          <MasterCard
+            key={master.id}
+            master={master}
+            variant={compact ? 'compact' : 'row'}
+            className="animate-rise"
+            serviceNames={serviceNames}
+            hrefQuery={{ service: params.service, model: params.model }}
+            priceCaption={master.price && (service || params.service) ? [service?.name, interpretation?.model?.name].filter(Boolean).join(' · ') : undefined}
+            mediaActions={<FavoriteButton masterId={master.id} />}
+            topActions={compact ? undefined : <CompareToggle master={master} />}
+            primaryAction={
+              compact ? undefined : (
+                <>
+                  <RevealContactsButton masterId={master.id} size="sm" compact />
+                  <WriteToMasterButton masterId={master.id} size="sm" compact />
+                  <Button size="sm" onClick={request}>
+                    <Send />
+                    {t('master.requestShort')}
+                  </Button>
+                </>
+              )
+            }
+          />
+        );
+      })}
       <div ref={sentinel} />
-      {query.isFetchingNextPage ? <MasterCardSkeleton /> : null}
+      {query.isFetchingNextPage ? <MasterCardSkeleton variant={compact ? 'compact' : 'row'} /> : null}
       {query.hasNextPage && !query.isFetchingNextPage ? (
         <Button variant="secondary" className="mx-auto mt-2" onClick={() => void query.fetchNextPage()}>
           {t('search.loadMore')}

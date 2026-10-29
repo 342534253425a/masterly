@@ -115,6 +115,13 @@ export function masterCard(master: catalog.Master, extra: CardExtras = {}): C.Ma
     price: extra.price ? { serviceId: extra.price.serviceId, modelId: extra.price.modelId, range: { from: rub(extra.price.fromMinor), to: extra.price.toMinor ? rub(extra.price.toMinor) : null } } : null,
     serviceIds: master.offers.filter((offer) => offer.enabled).map((offer) => offer.serviceId),
     photosCount: profile.photos?.length ?? 0,
+    gallery: (profile.photos ?? []).slice(0, 6).map((photo) => ({ id: photo.id, serviceId: photo.serviceId, caption: photo.caption })),
+    // Цены «от» по самым востребованным услугам — в выдаче цена видна и без выбранной услуги
+    offersPreview: master.offers
+      .filter((offer) => offer.enabled && offer.priceFromMinor > 0)
+      .sort((a, b) => (serviceById.get(b.serviceId)?.demand ?? 0) - (serviceById.get(a.serviceId)?.demand ?? 0))
+      .slice(0, 3)
+      .map((offer) => ({ serviceId: offer.serviceId, priceFrom: rub(offer.priceFromMinor) })),
   };
 }
 

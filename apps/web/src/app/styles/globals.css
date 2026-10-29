@@ -298,3 +298,16 @@ html[data-motion='reduced'] *::after {
 .maplibregl-ctrl-attrib a {
   color: var(--muted) !important;
 }
+/* Мини-карточка мастера у пина: своя карточка вместо белого «пузыря» MapLibre */
+.mly-popup {
+  z-index: 40;
+}
+.mly-popup .maplibregl-popup-content {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.mly-popup .maplibregl-popup-tip {
+  display: none;
+}

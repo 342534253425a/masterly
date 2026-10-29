@@ -14,7 +14,8 @@ export default defineConfig([
         {
           patterns: [
             {
-              group: ['@/entities/*/*', '@/features/*/*', '@/widgets/*/*', '@/pages/*/*'],
+              // Исключение — кросс-импорт сущностей через @x (FSD): @/entities/catalog/@x/master
+              group: ['@/entities/*/*', '!@/entities/*/@x', '@/features/*/*', '@/widgets/*/*', '@/pages/*/*'],
               message: 'Импортируйте через Public API слайса: @/entities/master, а не @/entities/master/ui/...',
             },
           ],

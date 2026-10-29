@@ -57,6 +57,10 @@ export const MasterCard = z.object({
   price: z.object({ serviceId: Id, modelId: Id.nullable(), range: PriceRange }).nullable(),
   serviceIds: z.array(Id),
   photosCount: z.number().int(),
+  /** Превью работ для галереи карточки в выдаче (до 6): иллюстрация по услуге и подпись. */
+  gallery: z.array(z.object({ id: Id, serviceId: Id, caption: z.string() })).max(6),
+  /** «От» по самым востребованным услугам мастера: цена видна в выдаче, даже если услуга не выбрана. */
+  offersPreview: z.array(z.object({ serviceId: Id, priceFrom: Rub })).max(3),
 });
 export type MasterCard = z.infer<typeof MasterCard>;
 

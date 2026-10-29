@@ -4,19 +4,19 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowUpDown, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { catalogQueries } from '@/entities/catalog';
-import { formatPrice } from '@/shared/lib';
+import { cn, formatPrice } from '@/shared/lib';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui';
 import type { SearchFilters } from '../model/search-params';
 import { useSearchFilters } from '../model/use-search-filters';
 
 const SORTS = ['relevance', 'price', 'rating', 'distance', 'response'] as const;
 
-export function SortSelect() {
+export function SortSelect({ className }: { className?: string }) {
   const t = useTranslations('search.sort');
   const { filters, setFilters } = useSearchFilters();
   return (
     <Select value={filters.sort} onValueChange={(value) => void setFilters({ sort: value as SearchFilters['sort'] })}>
-      <SelectTrigger className="h-9 w-auto min-w-48 rounded-full" aria-label={t('label')}>
+      <SelectTrigger className={cn('h-9 w-auto min-w-48 rounded-full', className)} aria-label={t('label')}>
         <ArrowUpDown className="size-3.5 text-subtle" />
         <SelectValue />
       </SelectTrigger>
@@ -50,7 +50,7 @@ export function ActiveFilters() {
   if (filters.express) chips.push({ key: 'express', label: t('filters.express'), clear: { express: null } });
   if (filters.visit) chips.push({ key: 'visit', label: t(`visit.${filters.visit}`), clear: { visit: null } });
   if (filters.parts) chips.push({ key: 'parts', label: t(`parts.${filters.parts}`), clear: { parts: null } });
-  if (filters.lat !== null) chips.push({ key: 'geo', label: `${t('filters.near')} · ${filters.radiusKm ?? 10} км`, clear: { lat: null, lng: null, radiusKm: null } });
+  if (filters.lat !== null) chips.push({ key: 'geo', label: t('filters.area', { km: filters.radiusKm ?? 10 }), clear: { lat: null, lng: null, radiusKm: null } });
   if (chips.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
