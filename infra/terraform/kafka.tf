@@ -24,15 +24,15 @@ resource "yandex_mdb_kafka_cluster" "main" {
         disk_size          = var.kafka.disk_size
       }
       kafka_config {
-        compression_type             = "COMPRESSION_TYPE_ZSTD"
-        log_retention_hours          = 168
-        num_partitions               = 12
-        default_replication_factor   = 3
-        auto_create_topics_enable    = false
-        message_max_bytes            = 1048588
-        replica_fetch_max_bytes      = 1048576
-        socket_send_buffer_bytes     = 1048576
-        socket_receive_buffer_bytes  = 1048576
+        compression_type            = "COMPRESSION_TYPE_ZSTD"
+        log_retention_hours         = 168
+        num_partitions              = 12
+        default_replication_factor  = 3
+        auto_create_topics_enable   = false
+        message_max_bytes           = 1048588
+        replica_fetch_max_bytes     = 1048576
+        socket_send_buffer_bytes    = 1048576
+        socket_receive_buffer_bytes = 1048576
       }
     }
 

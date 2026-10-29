@@ -49,13 +49,13 @@ resource "yandex_mdb_postgresql_cluster" "main" {
     }
 
     postgresql_config = {
-      max_connections                   = each.value.max_conns
-      shared_preload_libraries          = "SHARED_PRELOAD_LIBRARIES_PG_STAT_STATEMENTS"
-      log_min_duration_statement        = 250
+      max_connections                     = each.value.max_conns
+      shared_preload_libraries            = "SHARED_PRELOAD_LIBRARIES_PG_STAT_STATEMENTS"
+      log_min_duration_statement          = 250
       idle_in_transaction_session_timeout = 30000
-      random_page_cost                  = 1.1
-      effective_io_concurrency          = 200
-      default_statistics_target         = 500
+      random_page_cost                    = 1.1
+      effective_io_concurrency            = 200
+      default_statistics_target           = 500
     }
   }
 

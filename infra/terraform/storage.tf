@@ -43,8 +43,8 @@ resource "yandex_storage_bucket" "media" {
 
   # Незавершённые загрузки и неподтверждённые фото удаляются автоматически
   lifecycle_rule {
-    id      = "abort-multipart"
-    enabled = true
+    id                                     = "abort-multipart"
+    enabled                                = true
     abort_incomplete_multipart_upload_days = 1
   }
   lifecycle_rule {

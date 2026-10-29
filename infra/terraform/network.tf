@@ -1,6 +1,6 @@
 locals {
-  name   = "masterly-${var.environment}"
-  labels = { project = "masterly", environment = var.environment, managed_by = "terraform" }
+  name    = "masterly-${var.environment}"
+  labels  = { project = "masterly", environment = var.environment, managed_by = "terraform" }
   is_prod = var.environment == "production"
 }
 

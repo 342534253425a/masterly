@@ -50,11 +50,11 @@ variable "node_groups" {
 variable "postgres_clusters" {
   description = "Кластеры PostgreSQL: тяжёлые домены — отдельно, лёгкие — вместе (database-per-service внутри)"
   type = map(object({
-    preset     = string
-    disk_size  = number
-    hosts      = number
-    databases  = list(string)
-    max_conns  = number
+    preset    = string
+    disk_size = number
+    hosts     = number
+    databases = list(string)
+    max_conns = number
   }))
 }
 
@@ -86,9 +86,9 @@ variable "redis" {
 
 variable "opensearch" {
   type = object({
-    data_preset  = string
-    data_hosts   = number
-    disk_size    = number
+    data_preset = string
+    data_hosts  = number
+    disk_size   = number
   })
 }
 

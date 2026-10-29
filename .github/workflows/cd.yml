@@ -2,9 +2,9 @@ name: CD
 
 # Сборка образов → подпись (cosign keyless) и SBOM → GitOps-коммит тега в staging → k6 smoke →
 # ручное подтверждение → тот же digest в production. Деплой выполняет Argo CD, не CI.
+# Пока нет облака и секретов Yandex Cloud (YC_REGISTRY_ID, доступ к реестру и GitOps-репозиторию) — только ручной запуск.
+# Когда стенд поднят: вернуть push в main, чтобы каждый мерж выкатывался в staging.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -68,7 +68,7 @@ jobs:
       - name: Подпись образа (keyless, OIDC GitHub)
         run: cosign sign --yes "${{ env.REGISTRY }}/${{ matrix.service.name }}@${{ steps.build.outputs.digest }}"
       - name: Сканирование образа
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ matrix.service.name }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL
