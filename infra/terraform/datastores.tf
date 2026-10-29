@@ -90,6 +90,13 @@ resource "yandex_mdb_opensearch_cluster" "main" {
       plugins = ["analysis-icu", "analysis-morphology"]
     }
   }
+
+  # Обслуживание — на час позже PostgreSQL (вторник, 03:00 UTC): не обновлять оба хранилища одновременно
+  maintenance_window {
+    type = "WEEKLY"
+    day  = "TUE"
+    hour = 3
+  }
 }
 
 resource "random_password" "clickhouse" {
