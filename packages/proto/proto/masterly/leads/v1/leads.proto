@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+package masterly.leads.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Leads: заявки клиентов мастерам. Платформа не участвует в расчётах — заявка не является заказом с оплатой.
+service LeadsService {
+  rpc CreateLead(CreateLeadRequest) returns (CreateLeadResponse);
+  rpc GetLead(GetLeadRequest) returns (GetLeadResponse);
+  rpc ListClientLeads(ListClientLeadsRequest) returns (ListClientLeadsResponse);
+  rpc ListMasterLeads(ListMasterLeadsRequest) returns (ListMasterLeadsResponse);
+  rpc RespondToLead(RespondToLeadRequest) returns (RespondToLeadResponse);
+  rpc AcceptResponse(AcceptResponseRequest) returns (AcceptResponseResponse);
+  rpc DeclineLead(DeclineLeadRequest) returns (DeclineLeadResponse);
+  rpc ChangeLeadStatus(ChangeLeadStatusRequest) returns (ChangeLeadStatusResponse);
+  rpc CancelLead(CancelLeadRequest) returns (CancelLeadResponse);
+  rpc RevealContacts(RevealContactsRequest) returns (RevealContactsResponse);
+  rpc CountClientLeads(CountClientLeadsRequest) returns (CountClientLeadsResponse);
+}
+
+enum LeadStatus {
+  LEAD_STATUS_UNSPECIFIED = 0;
+  LEAD_STATUS_NEW = 1;
+  LEAD_STATUS_VIEWED = 2;
+  LEAD_STATUS_RESPONDED = 3;
+  LEAD_STATUS_ACCEPTED = 4;
+  LEAD_STATUS_IN_PROGRESS = 5;
+  LEAD_STATUS_COMPLETED = 6;
+  LEAD_STATUS_CANCELLED = 7;
+  LEAD_STATUS_DECLINED = 8;
+  LEAD_STATUS_EXPIRED = 9;
+}
+
+message Recipient {
+  string master_id = 1;
+  LeadStatus status = 2;
+  string viewed_at = 3;
+}
+
+message LeadResponse {
+  string id = 1;
+  string master_id = 2;
+  masterly.common.v1.PriceRange price = 3;
+  string message = 4;
+  int32 eta_min = 5;
+  string created_at = 6;
+  string status = 7;
+}
+
+message LeadEvent {
+  string type = 1;
+  string at = 2;
+  string actor = 3;
+  string note = 4;
+}
+
+message Lead {
+  string id = 1;
+  string number = 2;
+  string client_id = 3;
+  string city_id = 4;
+  string service_id = 5;
+  string model_id = 6;
+  string description = 7;
+  string urgency = 8;
+  string visit_type = 9;
+  string preferred_channel = 10;
+  bool share_phone = 11;
+  LeadStatus status = 12;
+  string created_at = 13;
+  string updated_at = 14;
+  string expires_at = 15;
+  repeated Recipient recipients = 16;
+  repeated LeadResponse responses = 17;
+  repeated LeadEvent timeline = 18;
+  string accepted_master_id = 19;
+  string conversation_id = 20;
+  string review_id = 21;
+}
+
+message CreateLeadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string idempotency_key = 2;
+  repeated string master_ids = 3;
+  bool broadcast = 4;
+  string city_id = 5;
+  string service_id = 6;
+  string model_id = 7;
+  string description = 8;
+  string urgency = 9;
+  string visit_type = 10;
+  string preferred_channel = 11;
+  bool share_phone = 12;
+  repeated string photo_ids = 13;
+}
+
+message CreateLeadResponse {
+  Lead lead = 1;
+}
+
+message GetLeadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+}
+
+message GetLeadResponse {
+  Lead lead = 1;
+}
+
+message ListClientLeadsRequest {
+  masterly.common.v1.RequestContext context = 1;
+  masterly.common.v1.PageRequest page = 2;
+}
+
+message ListClientLeadsResponse {
+  repeated Lead leads = 1;
+  masterly.common.v1.PageInfo page = 2;
+}
+
+message ListMasterLeadsRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string master_id = 2;
+  repeated LeadStatus statuses = 3;
+  masterly.common.v1.PageRequest page = 4;
+}
+
+message ListMasterLeadsResponse {
+  repeated Lead leads = 1;
+  masterly.common.v1.PageInfo page = 2;
+}
+
+message RespondToLeadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+  string master_id = 3;
+  masterly.common.v1.PriceRange price = 4;
+  string message = 5;
+  int32 eta_min = 6;
+}
+
+message RespondToLeadResponse {
+  Lead lead = 1;
+}
+
+message AcceptResponseRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+  string response_id = 3;
+}
+
+message AcceptResponseResponse {
+  Lead lead = 1;
+}
+
+message DeclineLeadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+  string master_id = 3;
+  string reason = 4;
+}
+
+message DeclineLeadResponse {
+  Lead lead = 1;
+}
+
+message ChangeLeadStatusRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+  LeadStatus status = 3;
+}
+
+message ChangeLeadStatusResponse {
+  Lead lead = 1;
+}
+
+message CancelLeadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+}
+
+message CancelLeadResponse {
+  Lead lead = 1;
+}
+
+message RevealContactsRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string master_id = 2;
+}
+
+message RevealContactsResponse {
+  string reveal_id = 1;
+  string phone = 2;
+  string telegram = 3;
+  string expires_at = 4;
+}
+
+message CountClientLeadsRequest {
+  repeated string client_ids = 1;
+}
+
+message CountClientLeadsResponse {
+  map<string, int32> counts = 1;
+}

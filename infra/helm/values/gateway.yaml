@@ -1,0 +1,41 @@
+# API Gateway (BFF): REST + OpenAPI, JWT, RBAC, rate limiting, идемпотентность
+nameOverride: gateway
+component: gateway
+image:
+  repository: cr.yandex/masterly/gateway
+ports:
+  grpc: 0
+  http: 8080
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  JWT_ISSUER: "https://id.masterly.ru"
+  PUBLIC_URL: "https://masterly.ru/api"
+  GRPC_REVIEWS: "dns:///reviews-headless:50055"
+  GRPC_MESSAGING: "dns:///messaging-headless:50056"
+  GRPC_NOTIFICATIONS: "dns:///notifications-headless:50057"
+  GRPC_MEDIA: "dns:///media-headless:50058"
+  GRPC_ANALYTICS: "dns:///analytics-headless:50059"
+  GRPC_TRUST: "dns:///trust-headless:50060"
+  REDIS_URL: "rediss://c-redis.mdb.yandexcloud.net:6380"
+  GRPC_SEARCH: "dns:///search-headless:50053"
+  GRPC_CATALOG: "dns:///catalog-headless:50052"
+  GRPC_LEADS: "dns:///leads-headless:50054"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+resources:
+  requests: { cpu: 500m, memory: 384Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 6
+  maxReplicas: 80
+networkPolicy:
+  allowFromNamespaces: [gateway, observability]
+  allowFrom: [web]
+# Браузер ходит в API того же сайта (cookie сессии host-only): masterly.ru/api/v1/... → шлюз /v1/...
+httpRoute:
+  enabled: true
+  hostnames: [masterly.ru]
+  pathPrefix: /api
+  rewritePrefix: /

@@ -1,0 +1,36 @@
+{
+  "name": "@masterly/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "API Gateway (BFF): REST из реестра контрактов → gRPC доменных сервисов. JWT, RBAC, GCRA, идемпотентность, дедлайны, load shedding, OpenAPI",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "start": "node --import ./dist/telemetry.js dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@masterly/contracts": "workspace:*",
+    "@masterly/fixtures": "workspace:*",
+    "@masterly/kernel": "workspace:*",
+    "@masterly/platform": "workspace:*",
+    "@masterly/proto": "workspace:*",
+    "fastify": "5.12.7",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "ws": "catalog:"
+  }
+}

@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package masterly.reviews.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Reviews: отзывы только по завершённым заявкам, антифрод-скоринг, агрегаты рейтинга.
+service ReviewsService {
+  rpc CreateReview(CreateReviewRequest) returns (CreateReviewResponse);
+  rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse);
+  rpc ReplyToReview(ReplyToReviewRequest) returns (ReplyToReviewResponse);
+  rpc GetRatingSummary(GetRatingSummaryRequest) returns (GetRatingSummaryResponse);
+  // Экспорт персональных данных: отзывы, написанные пользователем
+  rpc ListAuthorReviews(ListAuthorReviewsRequest) returns (ListAuthorReviewsResponse);
+}
+
+message Review {
+  string id = 1;
+  string master_id = 2;
+  string author_name = 3;
+  int32 rating = 4;
+  string text = 5;
+  string service_id = 6;
+  string model_id = 7;
+  string created_at = 8;
+  bool verified = 9;
+  int32 photos = 10;
+  int32 helpful = 11;
+  string reply_text = 12;
+  string reply_at = 13;
+  string status = 14;
+  double fraud_score = 15;
+}
+
+message CreateReviewRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string lead_id = 2;
+  int32 rating = 3;
+  string text = 4;
+  string device_fingerprint = 5;
+  string author_name = 6;
+}
+
+message CreateReviewResponse {
+  Review review = 1;
+}
+
+message ListReviewsRequest {
+  string master_id = 1;
+  string sort = 2;
+  optional int32 rating = 3;
+  bool with_photos = 4;
+  masterly.common.v1.PageRequest page = 5;
+}
+
+message ListReviewsResponse {
+  repeated Review reviews = 1;
+  masterly.common.v1.PageInfo page = 2;
+  repeated int32 distribution = 3;
+  double rating = 4;
+}
+
+message ReplyToReviewRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string review_id = 2;
+  string master_id = 3;
+  string text = 4;
+}
+
+message ReplyToReviewResponse {
+  Review review = 1;
+}
+
+message GetRatingSummaryRequest {
+  string master_id = 1;
+}
+
+message GetRatingSummaryResponse {
+  double rating = 1;
+  int32 reviews_count = 2;
+  repeated int32 distribution = 3;
+  int32 unanswered = 4;
+}
+
+message ListAuthorReviewsRequest {
+  string author_id = 1;
+}
+
+message ListAuthorReviewsResponse {
+  repeated Review reviews = 1;
+}

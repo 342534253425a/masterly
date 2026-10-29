@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: masterly
+    folder: Masterly
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

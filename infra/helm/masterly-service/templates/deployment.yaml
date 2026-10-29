@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  {{- if not (or .Values.autoscaling.enabled .Values.keda.enabled) }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 25%, maxUnavailable: 0 }
+  selector:
+    matchLabels: {{- include "svc.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "svc.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Values.env | toJson | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.topologySpread }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "svc.selector" . | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "svc.selector" . | nindent 14 }}
+      {{- end }}
+      containers:
+        - name: app
+          image: {{ include "svc.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{- if .Values.ports.grpc }}
+            - { name: grpc, containerPort: {{ .Values.ports.grpc }}, protocol: TCP }
+            {{- end }}
+            {{- if .Values.ports.http }}
+            - { name: http, containerPort: {{ .Values.ports.http }}, protocol: TCP }
+            {{- end }}
+            - { name: metrics, containerPort: {{ .Values.ports.metrics }}, protocol: TCP }
+          envFrom:
+            - configMapRef: { name: {{ include "svc.name" . }} }
+            {{- if .Values.externalSecret.enabled }}
+            - secretRef: { name: {{ include "svc.name" . }}-secrets }
+            {{- end }}
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            # Порты и имя задаёт чарт — сервис не может «разойтись» с Service/probe-портами из values
+            - { name: SERVICE_NAME, value: {{ include "svc.name" . | quote }} }
+            - { name: SERVICE_VERSION, value: {{ .Values.image.tag | default .Chart.AppVersion | quote }} }
+            - { name: NODE_ENV, value: "production" }
+            - { name: HEALTH_PORT, value: {{ .Values.ports.metrics | quote }} }
+            {{- if .Values.ports.grpc }}
+            - { name: GRPC_PORT, value: {{ .Values.ports.grpc | quote }} }
+            {{- end }}
+            {{- if .Values.ports.http }}
+            - { name: HTTP_PORT, value: {{ .Values.ports.http | quote }} }
+            {{- end }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.name={{ include "svc.name" . }},service.version={{ .Values.image.tag | default .Chart.AppVersion }},k8s.pod.name=$(POD_NAME)
+          startupProbe:
+            httpGet: { path: {{ .Values.probes.startup.path }}, port: metrics }
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+          livenessProbe:
+            httpGet: { path: {{ .Values.probes.liveness.path }}, port: metrics }
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet: { path: {{ .Values.probes.readiness.path }}, port: metrics }
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          lifecycle:
+            preStop:
+              sleep: { seconds: {{ .Values.lifecycle.preStopSleepSeconds }} }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }

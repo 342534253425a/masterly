@@ -1,0 +1,53 @@
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch:
+    send_batch_size: 8192
+    timeout: 2s
+  # Персональные данные не должны попадать в трейсы и логи
+  attributes/pii:
+    actions:
+      - { key: user.phone, action: delete }
+      - { key: user.email, action: delete }
+      - { key: http.request.header.cookie, action: delete }
+      - { key: http.request.header.authorization, action: delete }
+  # Хвостовой сэмплинг: все ошибки и медленные запросы + 10% остальных
+  tail_sampling:
+    decision_wait: 5s
+    policies:
+      - { name: errors, type: status_code, status_code: { status_codes: [ERROR] } }
+      - { name: slow, type: latency, latency: { threshold_ms: 500 } }
+      - { name: sample, type: probabilistic, probabilistic: { sampling_percentage: 10 } }
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls: { insecure: true }
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    resource_to_telemetry_conversion: { enabled: true }
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/pii, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/pii, batch]
+      exporters: [otlphttp/loki]

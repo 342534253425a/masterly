@@ -1,0 +1,28 @@
+# Analytics: Kafka → ClickHouse (батчи), отчёты кабинета и админки
+nameOverride: analytics
+component: backend
+image:
+  repository: cr.yandex/masterly/analytics
+ports:
+  grpc: 50059
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+  CLICKHOUSE_URL: "https://c-clickhouse.mdb.yandexcloud.net:8443"
+resources:
+  requests: { cpu: 500m, memory: 512Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 24
+keda:
+  enabled: true
+  consumerGroup: analytics
+  topics: [analytics.events.v1, analytics.search.v1]
+  maxReplicas: 48
+networkPolicy:
+  allowFrom: [gateway]

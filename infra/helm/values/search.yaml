@@ -1,0 +1,27 @@
+# Search: OpenSearch, понимание запроса, ранжирование, гео
+nameOverride: search
+component: backend
+image:
+  repository: cr.yandex/masterly/search
+ports:
+  grpc: 50053
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  OPENSEARCH_URL: "https://c-opensearch.mdb.yandexcloud.net:9200"
+resources:
+  requests: { cpu: 1, memory: 512Mi }
+  limits: { memory: 1Gi }
+autoscaling:
+  enabled: true
+  minReplicas: 6
+  maxReplicas: 60
+keda:
+  enabled: true
+  consumerGroup: search
+  topics: [catalog.master.v1, reviews.rating.v1]
+  maxReplicas: 24
+networkPolicy:
+  allowFrom: [gateway, leads] # leads подбирает получателей заявки

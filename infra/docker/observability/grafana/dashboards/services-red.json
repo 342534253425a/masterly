@@ -1,0 +1,68 @@
+{
+  "title": "Masterly — сервисы (RED)",
+  "uid": "masterly-red",
+  "schemaVersion": 39,
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(up{job=\"masterly-services\"}, service)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Rate: запросов в секунду",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+      "targets": [{ "expr": "sum by (service) (rate(http_server_requests_total{service=~\"$service\"}[1m])) + sum by (service) (rate(grpc_server_handled_total{service=~\"$service\"}[1m]))" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors: доля ошибок",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "expr": "sum by (service) (rate(grpc_server_handled_total{service=~\"$service\",grpc_code!=\"OK\"}[5m])) / sum by (service) (rate(grpc_server_handled_total{service=~\"$service\"}[5m]))" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Duration: p95 / p99",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (service, le) (rate(grpc_server_handling_seconds_bucket{service=~\"$service\"}[5m])))", "legendFormat": "p95 {{service}}" },
+        { "expr": "histogram_quantile(0.99, sum by (service, le) (rate(grpc_server_handling_seconds_bucket{service=~\"$service\"}[5m])))", "legendFormat": "p99 {{service}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka: лаг consumer-групп",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (group, topic) (kafka_consumergroup_lag)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox: неопубликованные события",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "max by (service) (outbox_pending_events)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis-кэш: hit ratio",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "expr": "sum by (service) (rate(cache_requests_total{result=\"hit\"}[5m])) / sum by (service) (rate(cache_requests_total[5m]))" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit breakers: открытые",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (service, target) (circuit_breaker_open)" }]
+    }
+  ]
+}

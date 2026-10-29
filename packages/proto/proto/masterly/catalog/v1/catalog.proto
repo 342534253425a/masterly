@@ -1,0 +1,334 @@
+syntax = "proto3";
+
+package masterly.catalog.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Catalog: профили мастеров, услуги и цены, модели устройств, график. Источник истины
+// для read-моделей (поиск, SEO) — изменения публикуются через transactional outbox.
+service CatalogService {
+  rpc GetMaster(GetMasterRequest) returns (GetMasterResponse);
+  rpc BatchGetMasters(BatchGetMastersRequest) returns (BatchGetMastersResponse);
+  rpc ListServices(ListServicesRequest) returns (ListServicesResponse);
+  rpc ListDeviceModels(ListDeviceModelsRequest) returns (ListDeviceModelsResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc UpsertOffers(UpsertOffersRequest) returns (UpsertOffersResponse);
+  rpc SetSchedule(SetScheduleRequest) returns (SetScheduleResponse);
+  // Контакты и политика их показа — только для leads (раскрытие логируется там)
+  rpc GetMasterContacts(GetMasterContactsRequest) returns (GetMasterContactsResponse);
+  rpc GetPriceStats(GetPriceStatsRequest) returns (GetPriceStatsResponse);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (UpdateCategoryResponse);
+  rpc UpdateService(UpdateServiceRequest) returns (UpdateServiceResponse);
+  rpc AddStaff(AddStaffRequest) returns (AddStaffResponse);
+  rpc RemoveStaff(RemoveStaffRequest) returns (RemoveStaffResponse);
+  rpc GetBilling(GetBillingRequest) returns (GetBillingResponse);
+  rpc RequestInvoice(RequestInvoiceRequest) returns (RequestInvoiceResponse);
+  // Интеграция с учётной системой: «счёт оплачен» → тариф или продвижение активны до даты
+  rpc MarkInvoicePaid(MarkInvoicePaidRequest) returns (MarkInvoicePaidResponse);
+  rpc GetPlatformStats(GetPlatformStatsRequest) returns (GetPlatformStatsResponse);
+}
+
+message Verification {
+  bool identity = 1;
+  bool business = 2;
+  bool address = 3;
+  string reviewed_at = 4;
+}
+
+message Offer {
+  string service_id = 1;
+  int64 price_from_minor = 2;
+  int64 price_to_minor = 3;
+  int32 duration_min = 4;
+  int32 warranty_days = 5;
+  repeated string parts = 6;
+  bool enabled = 7;
+}
+
+message DaySchedule {
+  int32 weekday = 1;
+  string open = 2;
+  string close = 3;
+  bool day_off = 4;
+}
+
+message Master {
+  string id = 1;
+  string slug = 2;
+  string kind = 3;
+  string name = 4;
+  string tagline = 5;
+  string about = 6;
+  string city_id = 7;
+  string district_id = 8;
+  string address = 9;
+  masterly.common.v1.GeoPoint location = 10;
+  double rating = 11;
+  int32 reviews_count = 12;
+  int32 experience_years = 13;
+  int32 response_time_min = 14;
+  int32 warranty_days = 15;
+  Verification verification = 16;
+  repeated string visit_types = 17;
+  bool express = 18;
+  string plan = 19;
+  string promotion_erid = 20;
+  repeated string brand_ids = 21;
+  repeated Offer offers = 22;
+  repeated DaySchedule schedule = 23;
+  string phone_masked = 24;
+  string status = 25;
+  int64 version = 26;
+  repeated string payment_methods = 27;
+  repeated string parts = 28;
+  bool accepting_leads = 29;
+  double service_radius_km = 30;
+  string contact_policy = 31;
+  int32 completeness = 32;
+  string owner_user_id = 33;
+  // Филиалы, сотрудники, портфолио и витринные поля — JSON до выделения отдельных сущностей
+  string profile_json = 34;
+  bool has_telegram = 35;
+  string vacation_from = 36;
+  string vacation_to = 37;
+  string plan_until = 38;
+}
+
+message GetMasterRequest {
+  oneof key {
+    string id = 1;
+    string slug = 2;
+  }
+}
+
+message GetMasterResponse {
+  Master master = 1;
+}
+
+message BatchGetMastersRequest {
+  repeated string ids = 1;
+}
+
+message BatchGetMastersResponse {
+  repeated Master masters = 1;
+}
+
+message Service {
+  string id = 1;
+  string slug = 2;
+  string category_id = 3;
+  string name = 4;
+  string description = 5;
+  int32 duration_min = 6;
+  int32 warranty_days = 7;
+  bool enabled = 8;
+}
+
+message ListServicesRequest {
+  string category_id = 1;
+}
+
+message ListServicesResponse {
+  repeated Service services = 1;
+}
+
+message DeviceModel {
+  string id = 1;
+  string brand_id = 2;
+  string name = 3;
+  int32 year = 4;
+  int32 tier = 5;
+}
+
+message ListDeviceModelsRequest {
+  string brand_id = 1;
+  string query = 2;
+}
+
+message ListDeviceModelsResponse {
+  repeated DeviceModel models = 1;
+}
+
+message UpdateProfileRequest {
+  string master_id = 1;
+  string name = 2;
+  string tagline = 3;
+  string about = 4;
+  string address = 5;
+  repeated string brand_ids = 6;
+  repeated string visit_types = 7;
+  repeated string payment_methods = 8;
+  repeated string parts = 9;
+  int32 warranty_days = 10;
+  bool express = 11;
+  int64 expected_version = 12; // оптимистическая блокировка
+}
+
+message UpdateProfileResponse {
+  Master master = 1;
+}
+
+message UpsertOffersRequest {
+  string master_id = 1;
+  repeated Offer offers = 2;
+}
+
+message UpsertOffersResponse {
+  repeated Offer offers = 1;
+}
+
+message SetScheduleRequest {
+  string master_id = 1;
+  repeated DaySchedule schedule = 2;
+  bool accepting_leads = 3;
+  double service_radius_km = 4;
+  // Отпуск: заявки не принимаются, поиск не предлагает мастера для заявок
+  string vacation_from = 5;
+  string vacation_to = 6;
+  repeated string visit_types = 7;
+}
+
+message SetScheduleResponse {
+  repeated DaySchedule schedule = 1;
+}
+
+message GetMasterContactsRequest {
+  string master_id = 1;
+}
+
+message GetMasterContactsResponse {
+  string phone = 1;
+  string telegram = 2;
+  // reveal | after_lead | chat_only
+  string policy = 3;
+  string owner_user_id = 4;
+}
+
+message GetPriceStatsRequest {
+  string city_id = 1;
+}
+
+message PriceStat {
+  string city_id = 1;
+  string service_id = 2;
+  int64 median_minor = 3;
+  int64 p25_minor = 4;
+  int64 p75_minor = 5;
+  int32 masters = 6;
+}
+
+message GetPriceStatsResponse {
+  repeated PriceStat stats = 1;
+}
+
+message Category {
+  string id = 1;
+  string slug = 2;
+  string name = 3;
+  string status = 4;
+  int32 services = 5;
+  int32 masters = 6;
+}
+
+message ListCategoriesRequest {}
+
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+}
+
+message UpdateCategoryRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message UpdateCategoryResponse {
+  Category category = 1;
+}
+
+message UpdateServiceRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional bool enabled = 4;
+}
+
+message UpdateServiceResponse {
+  Service service = 1;
+}
+
+message AddStaffRequest {
+  string master_id = 1;
+  string name = 2;
+  string phone = 3;
+  string role = 4;
+  string branch_id = 5;
+}
+
+message AddStaffResponse {
+  Master master = 1;
+}
+
+message RemoveStaffRequest {
+  string master_id = 1;
+  string staff_id = 2;
+}
+
+message RemoveStaffResponse {
+  Master master = 1;
+}
+
+message Invoice {
+  string id = 1;
+  string number = 2;
+  string product = 3;
+  int64 amount_minor = 4;
+  string status = 5;
+  string issued_at = 6;
+  string payer = 7;
+  string paid_at = 8;
+}
+
+message GetBillingRequest {
+  string master_id = 1;
+}
+
+message GetBillingResponse {
+  string plan = 1;
+  string plan_until = 2;
+  string promotion_until = 3;
+  repeated Invoice invoices = 4;
+}
+
+message RequestInvoiceRequest {
+  string master_id = 1;
+  string product = 2;
+  string payer = 3;
+  string inn = 4;
+  string email = 5;
+}
+
+message RequestInvoiceResponse {
+  Invoice invoice = 1;
+}
+
+message MarkInvoicePaidRequest {
+  string invoice_id = 1;
+}
+
+message MarkInvoicePaidResponse {
+  Invoice invoice = 1;
+}
+
+message GetPlatformStatsRequest {}
+
+message CityStat {
+  string city_id = 1;
+  int32 masters = 2;
+}
+
+message GetPlatformStatsResponse {
+  repeated CityStat cities = 1;
+  int32 masters_total = 2;
+  int32 verified_total = 3;
+}

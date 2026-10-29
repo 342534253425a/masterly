@@ -1,0 +1,98 @@
+# Базовые ресурсы кластера: неймспейсы с Pod Security Admission, публичный Gateway (Gateway API
+# на Yandex Application Load Balancer), хранилище секретов (Lockbox) и аутентификация KEDA в Kafka.
+# Операторы ставятся Helm-ом через Argo CD: KEDA, External Secrets, kube-prometheus-stack, OTel Operator.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: masterly
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+# По умолчанию в неймспейсе приложений входящий трафик запрещён — разрешения выдают чарты сервисов
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: masterly
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: gateway
+  annotations:
+    # Сертификат из Yandex Certificate Manager, WAF-профиль (Smart Web Security) — защита от ботов и DDoS L7
+    gateway.alb.yc.io/security-profile-id: masterly-sws
+spec:
+  gatewayClassName: yc-df-class
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: '*.masterly.ru'
+      tls:
+        mode: Terminate
+        certificateRefs: [{ group: '', kind: Secret, name: masterly-tls }]
+      allowedRoutes:
+        namespaces: { from: Selector, selector: { matchLabels: { kubernetes.io/metadata.name: masterly } } }
+    - name: https-apex
+      protocol: HTTPS
+      port: 443
+      hostname: masterly.ru
+      tls:
+        mode: Terminate
+        certificateRefs: [{ group: '', kind: Secret, name: masterly-tls }]
+      allowedRoutes:
+        namespaces: { from: Selector, selector: { matchLabels: { kubernetes.io/metadata.name: masterly } } }
+    - name: http-redirect
+      protocol: HTTP
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: gateway
+spec:
+  parentRefs: [{ name: public, sectionName: http-redirect }]
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect: { scheme: https, statusCode: 301 }
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: lockbox
+spec:
+  provider:
+    yandexlockbox:
+      auth:
+        authorizedKeySecretRef: { name: lockbox-sa-key, key: authorized-key, namespace: external-secrets }
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: kafka-sasl
+  namespace: masterly
+spec:
+  secretTargetRef:
+    - { parameter: sasl, name: keda-kafka, key: sasl }
+    - { parameter: username, name: keda-kafka, key: username }
+    - { parameter: password, name: keda-kafka, key: password }
+    - { parameter: tls, name: keda-kafka, key: tls }
+    - { parameter: ca, name: keda-kafka, key: ca }

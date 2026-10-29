@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "svc.selector" . | nindent 4 }}
+  ports:
+    {{- if .Values.ports.grpc }}
+    - { name: grpc, port: {{ .Values.ports.grpc }}, targetPort: grpc, appProtocol: kubernetes.io/h2c }
+    {{- end }}
+    {{- if .Values.ports.http }}
+    - { name: http, port: {{ .Values.ports.http }}, targetPort: http }
+    {{- end }}
+    - { name: metrics, port: {{ .Values.ports.metrics }}, targetPort: metrics }
+{{- if .Values.ports.grpc }}
+---
+# Headless-сервис для клиентской балансировки gRPC (round_robin по всем pod-ам, а не по одному TCP-соединению)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "svc.name" . }}-headless
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector: {{- include "svc.selector" . | nindent 4 }}
+  ports:
+    - { name: grpc, port: {{ .Values.ports.grpc }}, targetPort: grpc }
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+data:
+  SERVICE_NAME: {{ include "svc.name" . | quote }}
+  HEALTH_PORT: {{ .Values.ports.metrics | quote }}
+  {{- if .Values.ports.grpc }}
+  GRPC_PORT: {{ .Values.ports.grpc | quote }}
+  {{- end }}
+  {{- if .Values.ports.http }}
+  HTTP_PORT: {{ .Values.ports.http | quote }}
+  {{- end }}
+  {{- range $key, $value := .Values.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels: {{- include "svc.selector" . | nindent 6 }}
+{{- if and .Values.autoscaling.enabled (not .Values.keda.enabled) }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "svc.name" . }} }
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.autoscaling.targetCPUUtilization }} }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies: [{ type: Percent, value: 100, periodSeconds: 30 }]
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies: [{ type: Percent, value: 20, periodSeconds: 60 }]
+{{- end }}
+{{- if .Values.keda.enabled }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { name: {{ include "svc.name" . }} }
+  minReplicaCount: {{ .Values.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  cooldownPeriod: 120
+  triggers:
+    {{- range .Values.keda.topics }}
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ $.Values.env.KAFKA_BROKERS | quote }}
+        consumerGroup: {{ $.Values.keda.consumerGroup | quote }}
+        topic: {{ . | quote }}
+        lagThreshold: {{ $.Values.keda.lagThreshold | quote }}
+        offsetResetPolicy: earliest
+      authenticationRef: { name: kafka-sasl }
+    {{- end }}
+    - type: cpu
+      metricType: Utilization
+      metadata: { value: '70' }
+{{- end }}
+{{- if .Values.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "svc.selector" . | nindent 6 }}
+  endpoints:
+    - { port: metrics, path: /metrics, interval: {{ .Values.serviceMonitor.interval }} }
+{{- end }}
+{{- if .Values.networkPolicy.enabled }}
+---
+# Zero-trust внутри кластера: принимаем трафик только от разрешённых сервисов и мониторинга
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "svc.selector" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.allowFrom }}
+        - podSelector: { matchLabels: { app.kubernetes.io/name: {{ . }} } }
+        {{- end }}
+        {{- range .Values.networkPolicy.allowFromNamespaces }}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ . }} } }
+        {{- end }}
+{{- end }}
+{{- if .Values.externalSecret.enabled }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ include "svc.name" . }}-secrets
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  refreshInterval: {{ .Values.externalSecret.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: {{ .Values.externalSecret.secretStore }} }
+  target: { name: {{ include "svc.name" . }}-secrets }
+  dataFrom:
+    - extract: { key: {{ .Values.externalSecret.remoteKey | default (include "svc.name" .) }} }
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "svc.name" . }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - { name: {{ .Values.httpRoute.gateway.name }}, namespace: {{ .Values.httpRoute.gateway.namespace }} }
+  hostnames: {{- toYaml .Values.httpRoute.hostnames | nindent 4 }}
+  rules:
+    - matches: [{ path: { type: PathPrefix, value: {{ .Values.httpRoute.pathPrefix }} } }]
+      {{- if .Values.httpRoute.rewritePrefix }}
+      filters:
+        - type: URLRewrite
+          urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: {{ .Values.httpRoute.rewritePrefix }} } }
+      {{- end }}
+      backendRefs:
+        - { name: {{ include "svc.name" . }}, port: {{ .Values.ports.http }} }
+      timeouts: { request: {{ .Values.httpRoute.requestTimeout }} }
+{{- end }}
+{{- if .Values.migrations.enabled }}
+---
+# Миграции БД до выкатки новой версии; advisory lock исключает гонки, схема меняется по expand/contract
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "svc.name" . }}-migrate-{{ .Release.Revision }}
+  labels: {{- include "svc.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "svc.image" . }}
+          args: ['dist/migrate.js']
+          envFrom:
+            - configMapRef: { name: {{ include "svc.name" . }} }
+            - secretRef: { name: {{ include "svc.name" . }}-secrets }
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+{{- end }}

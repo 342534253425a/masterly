@@ -1,0 +1,48 @@
+# GitOps: Argo CD создаёт по приложению на каждый файл infra/helm/values/<service>.yaml для каждого окружения.
+# CI только обновляет тег образа в Git — выкатка, откат и дрейф конфигурации контролируются Argo CD.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: masterly-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: [missingkey=error]
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - { env: staging, cluster: https://staging.k8s.masterly.internal, autoSync: true }
+                - { env: production, cluster: https://prod.k8s.masterly.internal, autoSync: false }
+          - git:
+              repoURL: https://github.com/masterly/masterly.git
+              revision: main
+              files: [{ path: infra/helm/values/*.yaml }]
+  template:
+    metadata:
+      name: '{{ .env }}-{{ .path.filenameNormalized | trimSuffix ".yaml" }}'
+      labels: { app.kubernetes.io/part-of: masterly, env: '{{ .env }}' }
+    spec:
+      project: masterly
+      destination: { server: '{{ .cluster }}', namespace: masterly }
+      source:
+        repoURL: https://github.com/masterly/masterly.git
+        targetRevision: main
+        path: infra/helm/masterly-service
+        helm:
+          releaseName: '{{ .path.filenameNormalized | trimSuffix ".yaml" }}'
+          valueFiles:
+            - '../values/{{ .path.filename }}'
+            - '../values/env/{{ .env }}.yaml'
+            - '../values/tags/{{ .env }}/{{ .path.filename }}' # тег образа пишет CD-пайплайн
+          ignoreMissingValueFiles: true
+      syncPolicy:
+        syncOptions: [CreateNamespace=false, ServerSideApply=true, PruneLast=true]
+        retry: { limit: 5, backoff: { duration: 10s, factor: 2, maxDuration: 3m } }
+  templatePatch: |
+    {{- if .autoSync }}
+    spec:
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+    {{- end }}

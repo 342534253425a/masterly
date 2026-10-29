@@ -1,0 +1,69 @@
+packages:
+  - apps/*
+  - services/*
+  - packages/*
+
+# Скрипты установки разрешены только явно (защита цепочки поставок)
+allowBuilds:
+  msw: false
+  esbuild: true
+  "@swc/core": true
+  "@parcel/watcher": true
+  unrs-resolver: true
+  "@bufbuild/buf": true
+  protobufjs: false
+  "@nestjs/core": false
+
+# Единые версии зависимостей для всего монорепозитория (pnpm catalogs)
+catalog:
+  typescript: 6.0.3
+  zod: 4.6.7
+  vitest: 5.0.5
+  "@types/node": ^22.15.0
+  react: 19.3.1
+  react-dom: 19.3.1
+  "@types/react": ^19.2.0
+  "@types/react-dom": ^19.2.0
+  msw: 2.15.0
+  "@nestjs/common": 12.3.2
+  "@nestjs/core": 12.3.2
+  "@nestjs/microservices": 12.3.2
+  "@grpc/grpc-js": 1.14.6
+  "@grpc/proto-loader": 0.8.1
+  reflect-metadata: 0.2.2
+  rxjs: 7.8.2
+  kafkajs: 2.2.4
+  ioredis: 6.0.0
+  drizzle-orm: 0.45.4
+  pg: 8.23.1
+  "@types/pg": 8.23.1
+  pino: 10.4.0
+  jose: 6.2.13
+  cockatiel: 4.0.0
+  prom-client: 15.1.3
+  ws: 8.22.0
+  nodemailer: 7.0.13
+  web-push: 3.6.7
+  "@types/nodemailer": 8.0.2
+  "@types/web-push": 3.6.4
+  "@types/ws": 8.18.2
+
+minimumReleaseAgeExclude:
+  - "@hookform/resolvers@6.0.1"
+  - "@storybook/addon-a11y@10.6.5"
+  - "@storybook/addon-docs@10.6.5"
+  - "@storybook/builder-vite@10.6.5"
+  - "@storybook/nextjs-vite@10.6.5"
+  - "@storybook/react-dom-shim@10.6.5"
+  - "@storybook/react-vite@10.6.5"
+  - "@storybook/react@10.6.5"
+  - framer-motion@14.7.1
+  - lucide-react@1.62.0
+  - motion-dom@14.7.1
+  - motion-utils@14.7.0
+  - motion@14.7.1
+  - storybook@10.6.5
+  - vite-plugin-storybook-nextjs@10.6.5
+  - "@nestjs/common@12.3.2"
+  - "@nestjs/core@12.3.2"
+  - "@nestjs/microservices@12.3.2"

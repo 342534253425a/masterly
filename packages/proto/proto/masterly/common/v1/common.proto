@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package masterly.common.v1;
+
+// Деньги в минорных единицах (копейки): без потери точности float.
+message Money {
+  int64 amount_minor = 1;
+  string currency = 2;
+}
+
+message PriceRange {
+  int64 from_minor = 1;
+  optional int64 to_minor = 2;
+}
+
+message GeoPoint {
+  double lat = 1;
+  double lng = 2;
+}
+
+// Keyset-пагинация: курсор вместо OFFSET.
+message PageRequest {
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+message PageInfo {
+  string next_cursor = 1;
+  int64 total = 2;
+}
+
+// Контекст вызова, пробрасываемый шлюзом: пользователь, роль, локаль, корреляция.
+message RequestContext {
+  string user_id = 1;
+  string role = 2;
+  string request_id = 3;
+  string locale = 4;
+  string ip_hash = 5;
+  string master_id = 6; // профиль мастера, которым управляет пользователь (claim mid)
+  string name = 7; // отображаемое имя (для отзывов и системных сообщений)
+}

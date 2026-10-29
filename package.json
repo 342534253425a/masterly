@@ -1,0 +1,36 @@
+{
+  "name": "masterly",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Masterly — платформа поиска проверенных мастеров. Монорепозиторий: Next.js + FSD, NestJS-микросервисы, gRPC/Protobuf, Kafka, Redis, PostgreSQL, OpenSearch, ClickHouse.",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "build:packages": "turbo run build --filter=./packages/*",
+    "dev": "turbo run dev --filter=@masterly/web...",
+    "dev:backend": "turbo run dev --filter=./services/* --filter=@masterly/gateway",
+    "storybook": "turbo run storybook --filter=@masterly/web",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "proto:generate": "pnpm --filter @masterly/proto generate",
+    "proto:lint": "pnpm --filter @masterly/proto lint",
+    "infra:up": "docker compose -f infra/docker/compose.yaml --profile infra up -d",
+    "stack:up": "docker compose -f infra/docker/compose.yaml --profile infra --profile apps --profile observability up -d --build",
+    "stack:down": "docker compose -f infra/docker/compose.yaml --profile infra --profile apps --profile observability down",
+    "load:search": "k6 run tests/load/search.js",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yaml,yml,css}\"",
+    "validate:infra": "node scripts/validate-infra.mjs"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "turbo": "2.11.10",
+    "typescript": "catalog:",
+    "yaml": "2.8.1"
+  }
+}

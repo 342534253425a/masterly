@@ -1,0 +1,310 @@
+syntax = "proto3";
+
+package masterly.platform.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Вспомогательные сервисы платформы: уведомления, медиа, аналитика, доверие и безопасность.
+
+service NotificationsService {
+  rpc ListInbox(ListInboxRequest) returns (ListInboxResponse);
+  rpc MarkAllRead(MarkAllReadRequest) returns (MarkAllReadResponse);
+  rpc GetPreferences(GetPreferencesRequest) returns (GetPreferencesResponse);
+  rpc UpdatePreferences(UpdatePreferencesRequest) returns (UpdatePreferencesResponse);
+  rpc RegisterPushSubscription(RegisterPushSubscriptionRequest) returns (RegisterPushSubscriptionResponse);
+  rpc UnregisterPushSubscription(UnregisterPushSubscriptionRequest) returns (UnregisterPushSubscriptionResponse);
+  rpc GetPushConfig(GetPushConfigRequest) returns (GetPushConfigResponse);
+}
+
+message Notification {
+  string id = 1;
+  string kind = 2;
+  string title = 3;
+  string body = 4;
+  string href = 5;
+  string created_at = 6;
+  bool read = 7;
+}
+
+message ListInboxRequest {
+  masterly.common.v1.RequestContext context = 1;
+}
+
+message ListInboxResponse {
+  repeated Notification notifications = 1;
+}
+
+message MarkAllReadRequest {
+  masterly.common.v1.RequestContext context = 1;
+}
+
+message MarkAllReadResponse {}
+
+message ChannelSet {
+  repeated string channels = 1;
+}
+
+message Preferences {
+  map<string, ChannelSet> events = 1;
+  bool quiet_hours_enabled = 2;
+  string quiet_start = 3;
+  string quiet_end = 4;
+  string timezone = 5;
+}
+
+message GetPreferencesRequest {
+  masterly.common.v1.RequestContext context = 1;
+}
+
+message GetPreferencesResponse {
+  Preferences preferences = 1;
+}
+
+message UpdatePreferencesRequest {
+  masterly.common.v1.RequestContext context = 1;
+  Preferences preferences = 2;
+}
+
+message UpdatePreferencesResponse {
+  Preferences preferences = 1;
+}
+
+service MediaService {
+  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse);
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+}
+
+message CreateUploadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string content_type = 2;
+  int64 size = 3;
+  string purpose = 4;
+}
+
+message CreateUploadResponse {
+  string upload_id = 1;
+  string url = 2;
+  string expires_at = 3;
+  map<string, string> headers = 4;
+}
+
+message CompleteUploadRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string upload_id = 2;
+}
+
+message CompleteUploadResponse {
+  string asset_id = 1;
+  string status = 2;
+}
+
+service AnalyticsService {
+  rpc TrackEvents(TrackEventsRequest) returns (TrackEventsResponse);
+  rpc GetMasterReport(GetMasterReportRequest) returns (GetMasterReportResponse);
+  rpc GetSearchGaps(GetSearchGapsRequest) returns (GetSearchGapsResponse);
+  rpc GetPlatformOverview(GetPlatformOverviewRequest) returns (GetPlatformOverviewResponse);
+}
+
+message TrackedEvent {
+  string name = 1;
+  map<string, string> props = 2;
+  int64 ts = 3;
+}
+
+message TrackEventsRequest {
+  masterly.common.v1.RequestContext context = 1;
+  repeated TrackedEvent events = 2;
+}
+
+message TrackEventsResponse {}
+
+message DailyPoint {
+  string date = 1;
+  int64 impressions = 2;
+  int64 views = 3;
+  int64 contacts = 4;
+  int64 leads = 5;
+  // Показы в рекламных слотах (маркированные карточки)
+  int64 promoted = 6;
+}
+
+message GetMasterReportRequest {
+  string master_id = 1;
+  int32 days = 2;
+}
+
+message GetMasterReportResponse {
+  repeated DailyPoint series = 1;
+  map<string, double> sources = 2;
+  repeated int64 hours = 3;
+  repeated QueryStat queries = 4;
+}
+
+service TrustService {
+  rpc ListModerationItems(ListModerationItemsRequest) returns (ListModerationItemsResponse);
+  rpc DecideModeration(DecideModerationRequest) returns (DecideModerationResponse);
+  rpc ListDuplicateCandidates(ListDuplicateCandidatesRequest) returns (ListDuplicateCandidatesResponse);
+  rpc ResolveDuplicate(ResolveDuplicateRequest) returns (ResolveDuplicateResponse);
+  rpc CreateReport(CreateReportRequest) returns (CreateReportResponse);
+  rpc GetModerationStats(GetModerationStatsRequest) returns (GetModerationStatsResponse);
+}
+
+message RiskReason {
+  string code = 1;
+  string label = 2;
+  double weight = 3;
+}
+
+message ModerationItem {
+  string id = 1;
+  string kind = 2;
+  string status = 3;
+  string subject_id = 4;
+  string title = 5;
+  string content = 6;
+  double risk_score = 7;
+  repeated RiskReason reasons = 8;
+  string created_at = 9;
+}
+
+message ListModerationItemsRequest {
+  string kind = 1;
+  string status = 2;
+  masterly.common.v1.PageRequest page = 3;
+}
+
+message ListModerationItemsResponse {
+  repeated ModerationItem items = 1;
+}
+
+message DecideModerationRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string item_id = 2;
+  string decision = 3;
+  string reason_code = 4;
+}
+
+message DecideModerationResponse {
+  ModerationItem item = 1;
+}
+
+message DuplicateSignal {
+  string code = 1;
+  double value = 2;
+  bool matched = 3;
+}
+
+message DuplicateCandidate {
+  string id = 1;
+  string master_a_id = 2;
+  string master_b_id = 3;
+  double score = 4;
+  repeated DuplicateSignal signals = 5;
+  string status = 6;
+}
+
+message ListDuplicateCandidatesRequest {
+  string city_id = 1;
+}
+
+message ListDuplicateCandidatesResponse {
+  repeated DuplicateCandidate candidates = 1;
+}
+
+message ResolveDuplicateRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string candidate_id = 2;
+  string action = 3;
+}
+
+message ResolveDuplicateResponse {
+  DuplicateCandidate candidate = 1;
+}
+
+message GetSearchGapsRequest {
+  string city_id = 1;
+  int32 days = 2;
+  int32 limit = 3;
+}
+
+message SearchGap {
+  string query = 1;
+  string city_id = 2;
+  int64 hits = 3;
+}
+
+message GetSearchGapsResponse {
+  repeated SearchGap gaps = 1;
+}
+
+message RegisterPushSubscriptionRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string endpoint = 2;
+  string p256dh = 3;
+  string auth = 4;
+  string user_agent = 5;
+}
+
+message RegisterPushSubscriptionResponse {}
+
+message UnregisterPushSubscriptionRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string endpoint = 2;
+}
+
+message UnregisterPushSubscriptionResponse {}
+
+message GetPushConfigRequest {}
+
+message GetPushConfigResponse {
+  string vapid_public_key = 1;
+  bool enabled = 2;
+}
+
+message QueryStat {
+  string query = 1;
+  int64 impressions = 2;
+  int64 views = 3;
+  int64 leads = 4;
+}
+
+message DailySearches {
+  string date = 1;
+  int64 total = 2;
+  int64 zero_results = 3;
+}
+
+message GetPlatformOverviewRequest {
+  int32 days = 1;
+}
+
+message GetPlatformOverviewResponse {
+  repeated DailySearches searches = 1;
+  map<string, int64> leads_by_city = 2;
+  map<string, int64> searches_by_service = 3;
+  map<string, int64> leads_by_service = 4;
+  int64 views = 5;
+  int64 contacts = 6;
+  int64 leads = 7;
+}
+
+message CreateReportRequest {
+  masterly.common.v1.RequestContext context = 1;
+  // master | review | photo | message
+  string subject_type = 2;
+  string subject_id = 3;
+  string reason = 4;
+  string note = 5;
+}
+
+message CreateReportResponse {
+  string id = 1;
+}
+
+message GetModerationStatsRequest {}
+
+message GetModerationStatsResponse {
+  int32 pending = 1;
+  int32 high_risk = 2;
+  int32 sla_breached = 3;
+}

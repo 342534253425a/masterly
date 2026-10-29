@@ -1,0 +1,27 @@
+# Media: presigned-загрузки в Object Storage, очистка EXIF, pHash
+nameOverride: media
+component: backend
+image:
+  repository: cr.yandex/masterly/media
+ports:
+  grpc: 50058
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  S3_ENDPOINT: "https://storage.yandexcloud.net"
+  S3_REGION: "ru-central1"
+  S3_BUCKET: "masterly-production-media"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 12
+networkPolicy:
+  allowFrom: [gateway]
+migrations:
+  enabled: true

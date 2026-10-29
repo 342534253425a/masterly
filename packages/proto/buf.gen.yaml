@@ -1,0 +1,20 @@
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  # ts-proto: интерфейсы контроллеров/клиентов для NestJS + бинарные кодеки для событий Kafka.
+  # Опции согласованы с @grpc/proto-loader (keepCase=false, enums=String, longs=Number, defaults=true).
+  - local: ["node", "node_modules/ts-proto/protoc-gen-ts_proto"]
+    out: src/gen
+    opt:
+      - nestJs=true
+      - addGrpcMetadata=false
+      - stringEnums=true
+      - forceLong=number
+      - useDate=false
+      - esModuleInterop=true
+      - importSuffix=.js
+      - outputJsonMethods=false
+      - outputPartialMethods=false
+      - useOptionals=none
+      - exportCommonSymbols=false

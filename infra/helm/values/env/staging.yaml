@@ -1,0 +1,9 @@
+# Стейджинг: минимум реплик, без строгого PDB — экономия ресурсов
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 4
+keda:
+  minReplicas: 1
+  maxReplicas: 4
+pdb:
+  minAvailable: 0

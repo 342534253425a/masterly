@@ -1,0 +1,29 @@
+# Next.js (SSR/RSC) — standalone-образ
+nameOverride: web
+component: web
+image:
+  repository: cr.yandex/masterly/web
+ports:
+  grpc: 0
+  http: 3000
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  API_MODE: "live"
+  GATEWAY_URL: "http://gateway:8080"
+  NEXT_PUBLIC_SITE_URL: "https://masterly.ru"
+resources:
+  requests: { cpu: 1, memory: 512Mi }
+  limits: { memory: 768Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 6
+  maxReplicas: 60
+networkPolicy:
+  allowFrom: []
+  allowFromNamespaces: [gateway, observability]
+httpRoute:
+  enabled: true
+  hostnames: [masterly.ru, www.masterly.ru]
+  pathPrefix: /

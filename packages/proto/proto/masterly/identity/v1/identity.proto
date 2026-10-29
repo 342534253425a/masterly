@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package masterly.identity.v1;
+
+// Identity: вход по OTP, короткоживущий JWT (EdDSA) + ротация refresh-токенов с детекцией повторного использования.
+service IdentityService {
+  rpc RequestOtp(RequestOtpRequest) returns (RequestOtpResponse);
+  rpc VerifyOtp(VerifyOtpRequest) returns (VerifyOtpResponse);
+  rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetJwks(GetJwksRequest) returns (GetJwksResponse);
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+  rpc UpdateConsents(UpdateConsentsRequest) returns (UpdateConsentsResponse);
+  // Сервис-владелец ПДн подтверждает исполнение удаления (ADR-0011)
+  rpc AcknowledgeErasure(AcknowledgeErasureRequest) returns (AcknowledgeErasureResponse);
+  rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
+  rpc UpdateSettings(UpdateSettingsRequest) returns (UpdateSettingsResponse);
+  rpc ListFavorites(ListFavoritesRequest) returns (ListFavoritesResponse);
+  rpc AddFavorite(AddFavoriteRequest) returns (AddFavoriteResponse);
+  rpc RemoveFavorite(RemoveFavoriteRequest) returns (RemoveFavoriteResponse);
+  rpc GetConsentLog(GetConsentLogRequest) returns (GetConsentLogResponse);
+  // Админка: поиск пользователей, роли и блокировка
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  // Адрес доставки уведомлений — только для notifications, шлюз наружу не отдаёт
+  rpc GetUserContacts(GetUserContactsRequest) returns (GetUserContactsResponse);
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_CLIENT = 1;
+  ROLE_MASTER = 2;
+  ROLE_ADMIN = 3;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string phone_masked = 3;
+  string email = 4;
+  repeated Role roles = 5;
+  string master_id = 6;
+  string city_id = 7;
+  string created_at = 8;
+  string status = 9;
+  Consents consents = 10;
+}
+
+message TokenPair {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 access_expires_at = 3;
+  int64 refresh_expires_at = 4;
+}
+
+message RequestOtpRequest {
+  string phone = 1;
+  string ip_hash = 2;
+  string device_id = 3;
+}
+
+message RequestOtpResponse {
+  string request_id = 1;
+  string phone_masked = 2;
+  int32 expires_in_sec = 3;
+  int32 resend_in_sec = 4;
+}
+
+message VerifyOtpRequest {
+  string request_id = 1;
+  string code = 2;
+  string user_agent = 3;
+  string ip_hash = 4;
+}
+
+message VerifyOtpResponse {
+  User user = 1;
+  TokenPair tokens = 2;
+}
+
+message RefreshSessionRequest {
+  string refresh_token = 1;
+}
+
+message RefreshSessionResponse {
+  TokenPair tokens = 1;
+}
+
+message RevokeSessionRequest {
+  string refresh_token = 1;
+  bool all_devices = 2;
+}
+
+message RevokeSessionResponse {}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetJwksRequest {}
+
+message GetJwksResponse {
+  string jwks_json = 1;
+}
+
+message DeleteAccountRequest {
+  string user_id = 1;
+}
+
+message DeleteAccountResponse {
+  string scheduled_at = 1;
+}
+
+message Consents {
+  bool analytics = 1;
+  bool personalization = 2;
+  bool marketing = 3;
+  int32 policy_version = 4;
+}
+
+message UpdateConsentsRequest {
+  string user_id = 1;
+  Consents consents = 2;
+}
+
+message UpdateConsentsResponse {
+  Consents consents = 1;
+}
+
+message AcknowledgeErasureRequest {
+  string user_id = 1;
+  string service = 2;
+}
+
+message AcknowledgeErasureResponse {}
+
+// Интерфейсные настройки (тема, радиус, сохранённые фильтры…) — JSON, который identity хранит, но не трактует
+message GetSettingsRequest {
+  string user_id = 1;
+}
+
+message GetSettingsResponse {
+  string settings_json = 1;
+  string city_id = 2;
+  Consents consents = 3;
+}
+
+message UpdateSettingsRequest {
+  string user_id = 1;
+  string settings_json = 2;
+  string city_id = 3;
+}
+
+message UpdateSettingsResponse {
+  string settings_json = 1;
+  string city_id = 2;
+}
+
+message ListFavoritesRequest {
+  string user_id = 1;
+}
+
+message ListFavoritesResponse {
+  repeated string master_ids = 1;
+}
+
+message AddFavoriteRequest {
+  string user_id = 1;
+  string master_id = 2;
+}
+
+message AddFavoriteResponse {}
+
+message RemoveFavoriteRequest {
+  string user_id = 1;
+  string master_id = 2;
+}
+
+message RemoveFavoriteResponse {}
+
+message ConsentEntry {
+  string purpose = 1;
+  bool granted = 2;
+  string at = 3;
+}
+
+message GetConsentLogRequest {
+  string user_id = 1;
+}
+
+message GetConsentLogResponse {
+  repeated ConsentEntry entries = 1;
+}
+
+message AdminUser {
+  User user = 1;
+  string last_seen_at = 2;
+}
+
+message ListUsersRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message ListUsersResponse {
+  repeated AdminUser users = 1;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  repeated Role roles = 2;
+  // active | blocked; пусто — не менять
+  string status = 3;
+}
+
+message UpdateUserResponse {
+  AdminUser user = 1;
+}
+
+message GetUserContactsRequest {
+  string user_id = 1;
+}
+
+message GetUserContactsResponse {
+  string email = 1;
+  string phone = 2;
+  string name = 3;
+}

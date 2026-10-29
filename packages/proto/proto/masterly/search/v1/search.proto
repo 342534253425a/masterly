@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package masterly.search.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Search: понимание запроса (проблема → услуга + модель), ранжирование в OpenSearch
+// (function_score: рейтинг, отзывы, расстояние, скорость ответа, цена), фасеты, гео-агрегации.
+// Возвращает id и скоринг — карточки шлюз гидратирует из кэша каталога (batch get).
+service SearchService {
+  rpc SearchMasters(SearchMastersRequest) returns (SearchMastersResponse);
+  rpc Suggest(SuggestRequest) returns (SuggestResponse);
+  rpc MapPins(MapPinsRequest) returns (MapPinsResponse);
+}
+
+enum Sort {
+  SORT_UNSPECIFIED = 0;
+  SORT_RELEVANCE = 1;
+  SORT_PRICE = 2;
+  SORT_RATING = 3;
+  SORT_DISTANCE = 4;
+  SORT_RESPONSE = 5;
+}
+
+message SearchFilters {
+  string query = 1;
+  string city_id = 2;
+  string service_id = 3;
+  string model_id = 4;
+  string brand_id = 5;
+  optional double lat = 6;
+  optional double lng = 7;
+  optional double radius_km = 8;
+  optional int64 price_max_minor = 9;
+  optional double rating_min = 10;
+  optional int32 warranty_min_days = 11;
+  bool open_now = 12;
+  bool verified_only = 13;
+  bool express_only = 14;
+  string visit_type = 15;
+  string parts = 16;
+  bool accepting_leads_only = 17; // подбор получателей заявки: только мастера, принимающие заявки
+}
+
+message SearchMastersRequest {
+  SearchFilters filters = 1;
+  Sort sort = 2;
+  masterly.common.v1.PageRequest page = 3;
+  masterly.common.v1.RequestContext context = 4;
+}
+
+message ServiceMatch {
+  string service_id = 1;
+  double score = 2;
+}
+
+message Interpretation {
+  repeated ServiceMatch services = 1;
+  string brand_id = 2;
+  string model_id = 3;
+  bool urgent = 4;
+  double confidence = 5;
+  repeated string matched_terms = 6;
+}
+
+message SearchHit {
+  string master_id = 1;
+  double score = 2;
+  masterly.common.v1.PriceRange price = 3;
+  optional double distance_km = 4;
+  bool promoted = 5;
+}
+
+message FacetBucket {
+  string key = 1;
+  int64 count = 2;
+}
+
+message PriceBucket {
+  int64 from_minor = 1;
+  int64 to_minor = 2;
+  int64 count = 3;
+}
+
+message SearchMastersResponse {
+  string search_id = 1;
+  repeated SearchHit hits = 2;
+  masterly.common.v1.PageInfo page = 3;
+  Interpretation interpretation = 4;
+  repeated FacetBucket services = 5;
+  repeated FacetBucket districts = 6;
+  repeated PriceBucket price_histogram = 7;
+  int32 took_ms = 8;
+}
+
+message SuggestRequest {
+  string query = 1;
+  string city_id = 2;
+}
+
+message Suggestion {
+  string type = 1;
+  string id = 2;
+  string title = 3;
+  string subtitle = 4;
+  map<string, string> query = 5;
+}
+
+message SuggestResponse {
+  repeated Suggestion suggestions = 1;
+  Interpretation interpretation = 2;
+}
+
+message MapPinsRequest {
+  SearchFilters filters = 1;
+  int32 zoom = 2;
+}
+
+// При низком зуме — кластеры geotile_grid вместо отдельных точек (масштабирование на миллионы объектов).
+message MapCluster {
+  masterly.common.v1.GeoPoint center = 1;
+  int64 count = 2;
+  string geotile = 3;
+}
+
+message MapPin {
+  string master_id = 1;
+  masterly.common.v1.GeoPoint location = 2;
+  double rating = 3;
+  optional int64 price_from_minor = 4;
+  bool promoted = 5;
+  string slug = 6;
+  string name = 7;
+}
+
+message MapPinsResponse {
+  repeated MapPin pins = 1;
+  repeated MapCluster clusters = 2;
+}

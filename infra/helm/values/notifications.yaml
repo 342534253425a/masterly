@@ -1,0 +1,37 @@
+# Notifications: предпочтения, тихие часы и отложенная доставка (таблица доставок + SKIP LOCKED).
+# Каналы: email — SMTP (Yandex Cloud Postbox), SMS — HTTP-шлюз оператора, push — Web Push (VAPID).
+# Секреты в Lockbox: SMTP_URL, SMS_PROVIDER_URL, SMS_PROVIDER_TOKEN, VAPID_PRIVATE_KEY. Адреса получателей — из identity и catalog в момент отправки.
+nameOverride: notifications
+component: backend
+image:
+  repository: cr.yandex/masterly/notifications
+ports:
+  grpc: 50057
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+  GRPC_CATALOG: "dns:///catalog-headless:50052"
+  PUBLIC_URL: "https://masterly.ru"
+  MAIL_FROM: "Masterly <no-reply@masterly.ru>"
+  VAPID_SUBJECT: "mailto:support@masterly.ru"
+  # Публичная половина пары VAPID (генерируется один раз: npx web-push generate-vapid-keys); приватная — в Lockbox
+  VAPID_PUBLIC_KEY: ""
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 24
+keda:
+  enabled: true
+  consumerGroup: notifications
+  topics: [leads.lead.v1, messaging.message.v1, reviews.review.v1, trust.moderation.v1]
+  maxReplicas: 24
+networkPolicy:
+  allowFrom: [gateway]
+migrations:
+  enabled: true

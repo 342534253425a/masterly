@@ -1,0 +1,194 @@
+syntax = "proto3";
+
+package masterly.events.v1;
+
+// Конверт события (совместим с CloudEvents 1.0, binary mode через заголовки Kafka).
+// Ключ сообщения = subject (id агрегата) → порядок событий одного агрегата гарантирован в партиции.
+message EventEnvelope {
+  string id = 1; // UUIDv7 — ключ идемпотентности потребителя (inbox)
+  string type = 2; // например, "leads.lead.created.v1"
+  string source = 3; // имя сервиса-источника
+  string subject = 4; // id агрегата
+  string time = 5; // RFC 3339
+  string trace_parent = 6; // W3C Trace Context для сквозной трассировки через Kafka
+  string data_content_type = 7; // application/x-protobuf
+  bytes data = 8;
+  int32 schema_version = 9;
+}
+
+// ── identity ────────────────────────────────────────────────────────────────────
+// Топик identity.account.v1 (ключ = user_id): права субъекта ПДн исполняет каждый сервис — владелец данных.
+message AccountDeletionRequested {
+  string user_id = 1;
+  string requested_at = 2;
+  // Данные, которые закон обязывает хранить, обезличиваются сразу и удаляются после этой даты (legal hold)
+  string retain_until = 3;
+  repeated string roles = 4;
+}
+
+message ConsentChanged {
+  string user_id = 1;
+  bool analytics = 2;
+  bool personalization = 3;
+  bool marketing = 4;
+  int32 policy_version = 5;
+  string at = 6;
+}
+
+// ── catalog ─────────────────────────────────────────────────────────────────────
+// Компактированный топик catalog.master.v1: последнее состояние профиля = read-модель для поиска.
+message MasterUpserted {
+  string master_id = 1;
+  string slug = 2;
+  string city_id = 3;
+  string district_id = 4;
+  string name = 5;
+  string tagline = 6;
+  double lat = 7;
+  double lng = 8;
+  double rating = 9;
+  int32 reviews_count = 10;
+  int32 response_time_min = 11;
+  int32 warranty_days = 12;
+  bool verified = 13;
+  bool express = 14;
+  string plan = 15;
+  string promotion_erid = 16;
+  repeated string brand_ids = 17;
+  repeated string visit_types = 18;
+  repeated string parts = 19;
+  repeated OfferSnapshot offers = 20;
+  repeated string open_hours = 21; // "0:10:00-21:00" (weekday:open-close)
+  int32 completeness = 22;
+  string status = 23;
+  int64 version = 24; // монотонная версия: защита от переупорядочивания
+  string phone_hash = 25; // HMAC телефона (не сам телефон): сигнал дубликатов для trust
+  string owner_user_id = 26;
+  bool accepting_leads = 27;
+  double service_radius_km = 28;
+}
+
+message OfferSnapshot {
+  string service_id = 1;
+  int64 price_from_minor = 2;
+  int64 price_to_minor = 3;
+  repeated int64 tier_prices_minor = 4; // цена по сегментам устройств 1…5
+  int32 duration_min = 5;
+  int32 warranty_days = 6;
+}
+
+message MasterDeleted {
+  string master_id = 1;
+  string reason = 2;
+}
+
+// ── leads ───────────────────────────────────────────────────────────────────────
+message LeadCreated {
+  string lead_id = 1;
+  string client_id = 2;
+  repeated string master_ids = 3;
+  string service_id = 4;
+  string model_id = 5;
+  string city_id = 6;
+  string urgency = 7;
+  string created_at = 8;
+}
+
+message LeadResponded {
+  string lead_id = 1;
+  string master_id = 2;
+  string response_id = 3;
+  int64 price_from_minor = 4;
+  int32 eta_min = 5;
+  string client_id = 6;
+}
+
+message LeadStatusChanged {
+  string lead_id = 1;
+  string master_id = 2;
+  string client_id = 3;
+  string from_status = 4;
+  string to_status = 5;
+  string actor = 6;
+  string at = 7;
+}
+
+message ContactRevealed {
+  string master_id = 1;
+  string user_id = 2;
+  string at = 3;
+}
+
+// ── reviews ─────────────────────────────────────────────────────────────────────
+message ReviewCreated {
+  string review_id = 1;
+  string master_id = 2;
+  string lead_id = 3;
+  string author_id = 4;
+  int32 rating = 5;
+  string text_simhash = 6; // 64-битный SimHash текста в hex (поиск похожих отзывов)
+  string created_at = 7;
+}
+
+message RatingAggregated {
+  string master_id = 1;
+  double rating = 2;
+  int32 reviews_count = 3;
+  repeated int32 distribution = 4;
+}
+
+// ── messaging / media / trust ───────────────────────────────────────────────────
+message MessageSent {
+  string message_id = 1;
+  string conversation_id = 2;
+  string author_id = 3;
+  string recipient_id = 4;
+  string preview = 5;
+  string at = 6;
+}
+
+message MediaUploaded {
+  string asset_id = 1;
+  string owner_id = 2;
+  string purpose = 3;
+  string sha256 = 4;
+  string phash = 5;
+  string content_type = 6;
+  int64 size = 7;
+}
+
+message ModerationDecided {
+  string item_id = 1;
+  string kind = 2;
+  string subject_id = 3;
+  string decision = 4;
+  string reason_code = 5;
+  string moderator_id = 6;
+  string at = 7;
+}
+
+// ── analytics (поток в ClickHouse) ──────────────────────────────────────────────
+message SearchPerformed {
+  string search_id = 1;
+  string query = 2;
+  string city_id = 3;
+  string service_id = 4;
+  string model_id = 5;
+  int32 results_count = 6;
+  int32 took_ms = 7;
+  string user_hash = 8;
+  string at = 9;
+  // Показанные карточки в порядке выдачи: из них считаются «показы в поиске» без отдельного события на карточку
+  repeated string shown_master_ids = 10;
+  // Рекламные слоты (маркированные карточки) — отдельная статистика для отчётов о продвижении
+  repeated string promoted_master_ids = 11;
+}
+
+message ProductEvent {
+  string name = 1;
+  string user_hash = 2;
+  string master_id = 3;
+  string search_id = 4;
+  map<string, string> props = 5;
+  string at = 6;
+}

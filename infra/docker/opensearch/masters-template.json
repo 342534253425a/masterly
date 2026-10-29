@@ -1,0 +1,227 @@
+{
+  "index_patterns": [
+    "masters-*"
+  ],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "1s",
+      "analysis": {
+        "filter": {
+          "ru_stop": {
+            "type": "stop",
+            "stopwords": "_russian_"
+          },
+          "ru_stemmer": {
+            "type": "stemmer",
+            "language": "russian"
+          },
+          "repair_synonyms": {
+            "type": "synonym_graph",
+            "lenient": true,
+            "synonyms": [
+              "экран, дисплей, тачскрин, сенсор, модуль",
+              "аккумулятор, батарея, акб",
+              "разъем, гнездо, порт, зарядка",
+              "айфон, iphone, эпл, apple",
+              "самсунг, samsung, галакси, galaxy",
+              "сяоми, ксиоми, xiaomi, редми, redmi"
+            ]
+          },
+          "edge_ngrams": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 15
+          }
+        },
+        "analyzer": {
+          "ru_text": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "char_filter": [
+              "yo_to_e"
+            ],
+            "filter": [
+              "lowercase",
+              "ru_stop",
+              "ru_stemmer"
+            ]
+          },
+          "autocomplete": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "char_filter": [
+              "yo_to_e"
+            ],
+            "filter": [
+              "lowercase",
+              "edge_ngrams"
+            ]
+          },
+          "ru_search": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "char_filter": [
+              "yo_to_e"
+            ],
+            "filter": [
+              "lowercase",
+              "repair_synonyms",
+              "ru_stop",
+              "ru_stemmer"
+            ]
+          }
+        },
+        "char_filter": {
+          "yo_to_e": {
+            "type": "mapping",
+            "mappings": [
+              "ё => е",
+              "Ё => Е"
+            ]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "master_id": {
+          "type": "keyword"
+        },
+        "slug": {
+          "type": "keyword"
+        },
+        "city_id": {
+          "type": "keyword"
+        },
+        "district_id": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "text",
+          "analyzer": "ru_text",
+          "fields": {
+            "suggest": {
+              "type": "text",
+              "analyzer": "autocomplete",
+              "search_analyzer": "standard"
+            },
+            "raw": {
+              "type": "keyword"
+            }
+          },
+          "search_analyzer": "ru_search"
+        },
+        "tagline": {
+          "type": "text",
+          "analyzer": "ru_text",
+          "search_analyzer": "ru_search"
+        },
+        "location": {
+          "type": "geo_point"
+        },
+        "rating": {
+          "type": "float"
+        },
+        "bayesian_rating": {
+          "type": "float"
+        },
+        "reviews_count": {
+          "type": "integer"
+        },
+        "response_time_min": {
+          "type": "integer"
+        },
+        "warranty_days": {
+          "type": "integer"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "express": {
+          "type": "boolean"
+        },
+        "plan": {
+          "type": "keyword"
+        },
+        "promoted": {
+          "type": "boolean"
+        },
+        "brand_ids": {
+          "type": "keyword"
+        },
+        "visit_types": {
+          "type": "keyword"
+        },
+        "parts": {
+          "type": "keyword"
+        },
+        "service_ids": {
+          "type": "keyword"
+        },
+        "offers": {
+          "type": "nested",
+          "properties": {
+            "service_id": {
+              "type": "keyword"
+            },
+            "price_from": {
+              "type": "long"
+            },
+            "tier_prices": {
+              "type": "long"
+            },
+            "warranty_days": {
+              "type": "integer"
+            },
+            "duration_min": {
+              "type": "integer"
+            }
+          }
+        },
+        "open_hours": {
+          "type": "nested",
+          "properties": {
+            "weekday": {
+              "type": "byte"
+            },
+            "open_min": {
+              "type": "short"
+            },
+            "close_min": {
+              "type": "short"
+            }
+          }
+        },
+        "completeness": {
+          "type": "byte"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "version": {
+          "type": "long"
+        },
+        "updated_at": {
+          "type": "date"
+        },
+        "accepting_leads": {
+          "type": "boolean"
+        },
+        "service_radius_km": {
+          "type": "float"
+        },
+        "rating_source": {
+          "type": "keyword"
+        },
+        "promotion_erid": {
+          "type": "keyword",
+          "index": false
+        }
+      }
+    }
+  }
+}

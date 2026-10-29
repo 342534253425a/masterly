@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "title": "Masterly — 手机维修：附近可信赖的师傅",
+    "description": "描述问题，即可在莫斯科、圣彼得堡和克拉斯诺达尔找到经过验证的手机维修师傅。价格透明，有保修和评价，不收佣金。"
+  },
+  "common": {
+    "loading": "加载中…",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "showAll": "查看全部",
+    "free": "免费",
+    "priceFrom": "{price} 起",
+    "demoBadge": "演示模式"
+  },
+  "nav": {
+    "home": "首页",
+    "search": "搜索与地图",
+    "orders": "我的请求",
+    "messages": "消息",
+    "favorites": "收藏",
+    "profile": "个人资料",
+    "cabinet": "师傅工作台",
+    "admin": "管理后台",
+    "forMasters": "师傅入驻",
+    "help": "帮助与保修",
+    "login": "登录",
+    "logout": "退出",
+    "notifications": "通知",
+    "newRequest": "新请求",
+    "roles": { "client": "客户", "master": "师傅", "admin": "管理员" }
+  },
+  "home": {
+    "titleStart": "几分钟内找到",
+    "titleAccent": "可信赖的师傅",
+    "subtitle": "用自己的话描述问题——我们为您匹配附近的师傅，展示透明的价格、时间和保修。无佣金，无需预付。",
+    "searchPlaceholder": "例如：iPhone 13 屏幕碎了",
+    "searchCta": "寻找师傅",
+    "ai": { "badge": "AI 助手", "title": "描述故障，立即获得维修建议和透明报价", "cta": "AI 诊断", "aside": "更智能的维修从这里开始" },
+    "popular": "热门服务",
+    "topMasters": "附近的优秀师傅"
+  }
+}

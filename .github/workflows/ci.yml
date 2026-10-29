@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }} # удалённый кэш Turborepo (если настроен)
+  TURBO_TEAM: masterly
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build (affected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Только изменённые пакеты и их зависимые — граф задач Turborepo
+      - run: pnpm turbo run lint typecheck test build --affected
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || 'HEAD^1' }}
+      - name: Архитектура FSD (Steiger)
+        run: pnpm --filter @masterly/web lint:fsd
+
+  contracts:
+    name: Protobuf (buf lint + breaking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: bufbuild/buf-action@v1
+        with:
+          input: packages/proto
+          lint: true
+          format: true
+          breaking: ${{ github.event_name == 'pull_request' }}
+          breaking_against: ${{ github.event.repository.clone_url }}#branch=main,subdir=packages/proto
+          push: false
+
+  e2e:
+    name: E2E (Playwright, демо-режим)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@masterly/web...
+      - run: pnpm --filter @masterly/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @masterly/web start & npx wait-on http://localhost:3100
+      - run: pnpm --filter @masterly/web e2e --project=desktop --project=mobile
+        env: { E2E_BASE_URL: 'http://localhost:3100' }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: apps/web/playwright-report }
+
+  storybook:
+    name: Storybook + визуальные тесты
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=./packages/*
+      - run: pnpm --filter @masterly/web build-storybook
+      - uses: chromaui/action@v11
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        with:
+          projectToken: ${{ env.CHROMATIC_PROJECT_TOKEN }}
+          storybookBuildDir: apps/web/storybook-static
+          onlyChanged: true
+
+  infra:
+    name: Infra (Helm · K8s schemas · Terraform · Compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Helm lint и рендер всех сервисов + kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          for values in infra/helm/values/*.yaml; do
+            helm lint infra/helm/masterly-service -f "$values"
+            helm template "$(basename "$values" .yaml)" infra/helm/masterly-service -f "$values" \
+              | ./kubeconform -strict -ignore-missing-schemas -kubernetes-version 1.32.0 -summary
+          done
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform fmt / validate
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+      - uses: terraform-linters/setup-tflint@v4
+      - run: tflint --chdir infra/terraform
+      - name: Docker Compose
+        run: docker compose -f infra/docker/compose.yaml --profile infra --profile apps --profile observability config -q
+
+  security:
+    name: Security (Trivy · CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy — уязвимости, секреты, мисконфигурации IaC
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: trivy.sarif }
+      - uses: github/codeql-action/init@v3
+        with: { languages: javascript-typescript }
+      - uses: github/codeql-action/analyze@v3

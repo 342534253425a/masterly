@@ -1,0 +1,91 @@
+# Значения по умолчанию; переопределяются файлами infra/helm/values/<service>.yaml
+nameOverride: ''
+component: backend # backend | gateway | web
+
+image:
+  repository: cr.yandex/masterly/service
+  tag: '' # подставляется CI (git sha), по умолчанию — appVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+ports:
+  grpc: 0 # 0 — порт не публикуется
+  http: 0
+  metrics: 9464
+
+env: {}
+# Секреты из Yandex Lockbox через External Secrets Operator
+externalSecret:
+  enabled: true
+  secretStore: lockbox
+  remoteKey: ''
+  refreshInterval: 1h
+
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 512Mi } # CPU limit не задаём — избегаем троттлинга CFS
+
+probes:
+  startup: { path: /health/live, failureThreshold: 30, periodSeconds: 2 }
+  liveness: { path: /health/live, periodSeconds: 10 }
+  readiness: { path: /health/ready, periodSeconds: 5 }
+
+# Плавное завершение: sleep в preStop даёт балансировщикам убрать pod из эндпоинтов
+lifecycle:
+  preStopSleepSeconds: 10
+terminationGracePeriodSeconds: 45
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 30
+  targetCPUUtilization: 65
+
+# Масштабирование консьюмеров по лагу Kafka (KEDA)
+keda:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 48 # не больше числа партиций
+  consumerGroup: ''
+  topics: []
+  lagThreshold: '2000'
+
+pdb:
+  minAvailable: '66%'
+
+topologySpread: true # равномерно по зонам ru-central1-a/b/d и по нодам
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+
+networkPolicy:
+  enabled: true
+  # Кому разрешено обращаться к сервису (метки app.kubernetes.io/name)
+  allowFrom: [gateway]
+  allowFromNamespaces: [observability]
+
+httpRoute:
+  enabled: false
+  hostnames: []
+  pathPrefix: /
+  # Заменить совпавший префикс перед отправкой в сервис (Gateway API URLRewrite): /api/v1/... → /v1/...
+  rewritePrefix: ''
+  # Таймаут запроса на маршруте; 0s — без таймаута (долгоживущие WebSocket)
+  requestTimeout: 30s
+  gateway: { name: public, namespace: gateway }
+
+migrations:
+  enabled: false # pre-upgrade Job: node dist/migrate.js (advisory lock, expand/contract)
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }

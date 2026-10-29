@@ -1,0 +1,121 @@
+name: CD
+
+# Сборка образов → подпись (cosign keyless) и SBOM → GitOps-коммит тега в staging → k6 smoke →
+# ручное подтверждение → тот же digest в production. Деплой выполняет Argo CD, не CI.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+
+env:
+  REGISTRY: cr.yandex/${{ vars.YC_REGISTRY_ID }}
+
+jobs:
+  build:
+    name: Image · ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: gateway, package: '@masterly/gateway', path: apps/gateway, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: identity, package: '@masterly/identity', path: services/identity, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: catalog, package: '@masterly/catalog', path: services/catalog, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: search, package: '@masterly/search', path: services/search, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: leads, package: '@masterly/leads', path: services/leads, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: reviews, package: '@masterly/reviews', path: services/reviews, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: messaging, package: '@masterly/messaging', path: services/messaging, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: notifications, package: '@masterly/notifications', path: services/notifications, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: media, package: '@masterly/media', path: services/media, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: analytics, package: '@masterly/analytics', path: services/analytics, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: trust, package: '@masterly/trust', path: services/trust, dockerfile: infra/docker/node-service.Dockerfile }
+          - { name: web, package: '@masterly/web', path: apps/web, dockerfile: apps/web/Dockerfile }
+    outputs:
+      tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_SA_JSON_KEY }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          build-args: |
+            SERVICE=${{ matrix.service.package }}
+            SERVICE_PATH=${{ matrix.service.path }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+          provenance: mode=max
+          sbom: true
+      - uses: sigstore/cosign-installer@v3
+      - name: Подпись образа (keyless, OIDC GitHub)
+        run: cosign sign --yes "${{ env.REGISTRY }}/${{ matrix.service.name }}@${{ steps.build.outputs.digest }}"
+      - name: Сканирование образа
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.service.name }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+  deploy-staging:
+    name: GitOps → staging
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Обновить теги образов (Argo CD синхронизирует автоматически)
+        run: |
+          mkdir -p infra/helm/values/tags/staging
+          for values in infra/helm/values/*.yaml; do
+            service=$(basename "$values" .yaml)
+            printf 'image:\n  tag: %s\n' "${GITHUB_SHA}" > "infra/helm/values/tags/staging/${service}.yaml"
+          done
+          git config user.name "masterly-bot" && git config user.email "bot@masterly.dev"
+          git add infra/helm/values/tags && git commit -m "deploy(staging): ${GITHUB_SHA::8} [skip ci]" && git push
+
+  smoke:
+    name: k6 smoke на staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Дождаться выкатки и прогнать smoke
+        run: |
+          sleep 120
+          k6 run tests/load/search.js -e PROFILE=smoke -e BASE_URL=${{ vars.STAGING_URL }}
+          k6 run tests/load/lead-flow.js -e PROFILE=smoke -e BASE_URL=${{ vars.STAGING_URL }}
+
+  promote-production:
+    name: GitOps → production (ручное подтверждение)
+    needs: smoke
+    runs-on: ubuntu-latest
+    environment: production # required reviewers в настройках GitHub Environment
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - run: |
+          git pull --rebase
+          mkdir -p infra/helm/values/tags/production
+          cp infra/helm/values/tags/staging/*.yaml infra/helm/values/tags/production/
+          git config user.name "masterly-bot" && git config user.email "bot@masterly.dev"
+          git add infra/helm/values/tags && git commit -m "deploy(production): ${GITHUB_SHA::8} [skip ci]" && git push

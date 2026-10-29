@@ -1,0 +1,37 @@
+{
+  "name": "@masterly/catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Профили мастеров, услуги, цены, расписание — источник истины каталога",
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "start": "node --import ./dist/telemetry.js dist/main.js",
+    "migrate": "node dist/migrate.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@masterly/fixtures": "workspace:*",
+    "@masterly/kernel": "workspace:*",
+    "@masterly/platform": "workspace:*",
+    "@masterly/proto": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

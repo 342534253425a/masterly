@@ -1,0 +1,73 @@
+{
+  "name": "@masterly/platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Платформа микросервисов: конфиг, логи, метрики, трассировка, health, БД и миграции, outbox/inbox, Kafka, Redis, устойчивость, gRPC, bootstrap",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "default": "./dist/telemetry.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@masterly/kernel": "workspace:*",
+    "@masterly/proto": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.300.0",
+    "@opentelemetry/instrumentation-grpc": "0.300.0",
+    "@opentelemetry/instrumentation-http": "0.300.0",
+    "@opentelemetry/instrumentation-ioredis": "0.72.0",
+    "@opentelemetry/instrumentation-kafkajs": "0.33.0",
+    "@opentelemetry/instrumentation-pg": "0.77.0",
+    "@opentelemetry/sdk-node": "0.300.0",
+    "cockatiel": "catalog:",
+    "ioredis": "catalog:",
+    "jose": "catalog:",
+    "kafkajs": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "prom-client": "catalog:",
+    "protobufjs": "^7.5.5",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "*"
+  },
+  "peerDependenciesMeta": {
+    "@electric-sql/pglite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

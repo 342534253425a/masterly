@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package masterly.messaging.v1;
+
+import "masterly/common/v1/common.proto";
+
+// Messaging: история диалогов по gRPC, доставка в реальном времени — WebSocket (Socket.IO + Redis adapter).
+service MessagingService {
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc StartConversation(StartConversationRequest) returns (StartConversationResponse);
+}
+
+message Conversation {
+  string id = 1;
+  string lead_id = 2;
+  string client_id = 3;
+  string master_id = 4;
+  string subject = 5;
+  string last_message_text = 6;
+  string last_message_at = 7;
+  int32 unread = 8;
+}
+
+message Message {
+  string id = 1;
+  string conversation_id = 2;
+  string author_id = 3;
+  string kind = 4;
+  string text = 5;
+  string client_id = 6;
+  string created_at = 7;
+  string status = 8;
+}
+
+message ListConversationsRequest {
+  masterly.common.v1.RequestContext context = 1;
+  masterly.common.v1.PageRequest page = 2;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+}
+
+message ListMessagesRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string conversation_id = 2;
+  string before_id = 3;
+  int32 limit = 4;
+}
+
+message ListMessagesResponse {
+  Conversation conversation = 1;
+  repeated Message messages = 2;
+  string next_cursor = 3;
+}
+
+message SendMessageRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string conversation_id = 2;
+  string text = 3;
+  string client_id = 4; // идемпотентность при повторной отправке
+}
+
+message SendMessageResponse {
+  Message message = 1;
+}
+
+message StartConversationRequest {
+  masterly.common.v1.RequestContext context = 1;
+  string master_id = 2;
+  string lead_id = 3;
+}
+
+message StartConversationResponse {
+  Conversation conversation = 1;
+}

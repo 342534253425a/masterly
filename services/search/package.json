@@ -1,0 +1,35 @@
+{
+  "name": "@masterly/search",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Поиск по проблеме: понимание запроса, ранжирование, гео, подсказки, карта",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "start": "node --import ./dist/telemetry.js dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@masterly/fixtures": "workspace:*",
+    "@masterly/kernel": "workspace:*",
+    "@masterly/platform": "workspace:*",
+    "@masterly/proto": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

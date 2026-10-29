@@ -1,0 +1,41 @@
+{
+  "name": "@masterly/proto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Protobuf-контракты: gRPC API микросервисов и схемы событий Kafka. Buf lint + breaking change detection",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./proto/*": "./proto/*"
+  },
+  "files": ["dist", "proto"],
+  "scripts": {
+    "generate": "buf generate",
+    "lint": "buf lint && buf format --diff --exit-code",
+    "breaking": "buf breaking --against '../../.git#subdir=packages/proto'",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "rxjs": "catalog:"
+  },
+  "peerDependencies": {
+    "@grpc/grpc-js": "*",
+    "@nestjs/microservices": "*"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.75.0",
+    "@grpc/grpc-js": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "reflect-metadata": "catalog:",
+    "@types/node": "catalog:",
+    "ts-proto": "2.18.3",
+    "typescript": "catalog:"
+  }
+}

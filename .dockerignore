@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/storybook-static
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+.git
+infra/terraform
+docs
+tests/load
+*.md
+!README.md

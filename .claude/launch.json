@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "masterly-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd apps\\web && node node_modules\\next\\dist\\bin\\next dev"],
+      "port": 3100
+    },
+    {
+      "name": "masterly-storybook-local",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd apps\\web && node node_modules\\storybook\\dist\\bin\\dispatcher.js dev --no-open -p 6006"],
+      "port": 6006
+    }
+  ]
+}

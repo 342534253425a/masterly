@@ -1,0 +1,316 @@
+# Локальное окружение Masterly — полный стек, как в проде, на одной машине.
+#
+#   pnpm infra:up      # только хранилища и брокер (profile: infra)
+#   pnpm stack:up      # + все микросервисы, шлюз, web и наблюдаемость
+#
+# Порты на хосте: web 3100 · gateway 8080 · ws 8081 · kafka-ui 8085 · grafana 3001 · mailpit 8025
+# В проде те же роли выполняют managed-сервисы Yandex Cloud (см. infra/terraform).
+
+name: masterly
+
+x-service: &service
+  profiles: [apps]
+  build:
+    context: ../..
+    dockerfile: infra/docker/node-service.Dockerfile
+  restart: unless-stopped
+  env_file: [./env/common.env]
+  depends_on:
+    postgres: { condition: service_healthy }
+    valkey: { condition: service_healthy }
+    kafka: { condition: service_healthy }
+  deploy:
+    resources:
+      limits: { cpus: '0.5', memory: 384M }
+
+services:
+  # ── Хранилища и брокер ────────────────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:17-3.5
+    profiles: [infra]
+    environment:
+      POSTGRES_USER: masterly
+      POSTGRES_PASSWORD: masterly
+      POSTGRES_DB: masterly
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - max_connections=400
+      - -c
+      - wal_level=logical # для Debezium (CDC outbox) в прод-конфигурации
+    ports: ['5432:5432']
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U masterly']
+      interval: 5s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8.1-alpine
+    profiles: [infra]
+    command: ['valkey-server', '--appendonly', 'yes', '--maxmemory', '512mb', '--maxmemory-policy', 'allkeys-lfu']
+    ports: ['6379:6379']
+    volumes: [valkey-data:/data]
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:4.0.0
+    profiles: [infra]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_NUM_PARTITIONS: 3
+    ports: ['29092:29092']
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1']
+      interval: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:4.0.0
+    profiles: [infra]
+    depends_on:
+      kafka: { condition: service_healthy }
+    volumes: [./kafka/create-topics.sh:/create-topics.sh:ro]
+    entrypoint: ['bash', '/create-topics.sh']
+    restart: 'no'
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.2.0
+    profiles: [infra]
+    depends_on:
+      kafka: { condition: service_healthy }
+    environment:
+      KAFKA_CLUSTERS_0_NAME: masterly
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports: ['8085:8080']
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.1
+    profiles: [infra]
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      OPENSEARCH_JAVA_OPTS: -Xms768m -Xmx768m
+      bootstrap.memory_lock: 'true'
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    ports: ['9200:9200']
+    volumes: [opensearch-data:/usr/share/opensearch/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9200/_cluster/health > /dev/null']
+      interval: 10s
+      retries: 30
+
+  opensearch-init:
+    image: curlimages/curl:8.13.0
+    profiles: [infra]
+    depends_on:
+      opensearch: { condition: service_healthy }
+    volumes: [./opensearch:/templates:ro]
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        curl -fsS -X PUT http://opensearch:9200/_index_template/masters -H 'Content-Type: application/json' --data-binary @/templates/masters-template.json &&
+        curl -fsS -X PUT http://opensearch:9200/masters-v1 &&
+        curl -fsS -X POST http://opensearch:9200/_aliases -H 'Content-Type: application/json' -d '{"actions":[{"add":{"index":"masters-v1","alias":"masters"}}]}'
+    restart: 'no'
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
+    profiles: [infra]
+    environment:
+      CLICKHOUSE_USER: masterly
+      CLICKHOUSE_PASSWORD: masterly
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports: ['8123:8123', '9000:9000']
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8123/ping || exit 1']
+      interval: 10s
+      retries: 20
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    profiles: [infra]
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: masterly
+      MINIO_ROOT_PASSWORD: masterly-secret
+    ports: ['9100:9000', '9101:9001']
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.24
+    profiles: [infra]
+    ports: ['8025:8025', '1025:1025']
+
+  # ── Наблюдаемость: OTel Collector → Tempo (трейсы), Prometheus (метрики), Loki (логи) → Grafana ──
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    profiles: [observability]
+    command: ['--config=/etc/otel/collector.yaml']
+    volumes: [./otel/collector.yaml:/etc/otel/collector.yaml:ro]
+    ports: ['4317:4317', '4318:4318']
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    profiles: [observability]
+    command: ['-config.file=/etc/tempo/tempo.yaml']
+    volumes: [./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro]
+
+  loki:
+    image: grafana/loki:3.5.0
+    profiles: [observability]
+    command: ['-config.file=/etc/loki/local-config.yaml']
+
+  prometheus:
+    image: prom/prometheus:v3.3.0
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ['9090:9090']
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    profiles: [observability]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+    volumes:
+      - ./observability/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./observability/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ['3001:3000']
+
+  # ── Приложения (сборка из монорепозитория: один Dockerfile, разные SERVICE) ─────
+  gateway:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: infra/docker/node-service.Dockerfile
+      args: { SERVICE: '@masterly/gateway', SERVICE_PATH: apps/gateway }
+    environment: { SERVICE_NAME: gateway, HTTP_PORT: '8080', COOKIE_SECURE: 'false', PUBLIC_URL: 'http://localhost:8080' }
+    ports: ['8080:8080']
+    depends_on:
+      identity: { condition: service_started }
+      catalog: { condition: service_started }
+      search: { condition: service_started }
+      leads: { condition: service_started }
+      valkey: { condition: service_healthy }
+
+  identity:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/identity', SERVICE_PATH: services/identity } }
+    environment: { SERVICE_NAME: identity, GRPC_PORT: '50051', DATABASE_URL: 'postgres://identity:identity@postgres:5432/identity', NODE_ENV: development, OTP_DEV_CODE: '123456', SEED_DEMO: 'true' }
+
+  catalog:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/catalog', SERVICE_PATH: services/catalog } }
+    environment: { SERVICE_NAME: catalog, GRPC_PORT: '50052', DATABASE_URL: 'postgres://catalog:catalog@postgres:5432/catalog', SEED_DEMO: 'true' }
+
+  search:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/search', SERVICE_PATH: services/search } }
+    environment: { SERVICE_NAME: search, GRPC_PORT: '50053', OPENSEARCH_URL: 'http://opensearch:9200' }
+    depends_on:
+      opensearch: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+
+  leads:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/leads', SERVICE_PATH: services/leads } }
+    environment: { SERVICE_NAME: leads, GRPC_PORT: '50054', DATABASE_URL: 'postgres://leads:leads@postgres:5432/leads' }
+
+  reviews:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/reviews', SERVICE_PATH: services/reviews } }
+    environment: { SERVICE_NAME: reviews, GRPC_PORT: '50055', DATABASE_URL: 'postgres://reviews:reviews@postgres:5432/reviews' }
+
+  messaging:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/messaging', SERVICE_PATH: services/messaging } }
+    environment: { SERVICE_NAME: messaging, GRPC_PORT: '50056', HTTP_PORT: '8081', WS_ALLOWED_ORIGINS: 'http://localhost:3100', DATABASE_URL: 'postgres://messaging:messaging@postgres:5432/messaging' }
+    ports: ['8081:8081']
+
+  notifications:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/notifications', SERVICE_PATH: services/notifications } }
+    environment: { SERVICE_NAME: notifications, GRPC_PORT: '50057', DATABASE_URL: 'postgres://notifications:notifications@postgres:5432/notifications', SMTP_URL: 'smtp://mailpit:1025', PUBLIC_URL: 'http://localhost:3100' }
+
+  media:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/media', SERVICE_PATH: services/media } }
+    environment: { SERVICE_NAME: media, GRPC_PORT: '50058', DATABASE_URL: 'postgres://media:media@postgres:5432/media', S3_ENDPOINT: 'http://minio:9000', S3_PUBLIC_ENDPOINT: 'http://localhost:9100' }
+
+  analytics:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/analytics', SERVICE_PATH: services/analytics } }
+    environment: { SERVICE_NAME: analytics, GRPC_PORT: '50059', CLICKHOUSE_URL: 'http://clickhouse:8123' }
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  trust:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/node-service.Dockerfile, args: { SERVICE: '@masterly/trust', SERVICE_PATH: services/trust } }
+    environment: { SERVICE_NAME: trust, GRPC_PORT: '50060', DATABASE_URL: 'postgres://trust:trust@postgres:5432/trust' }
+
+  web:
+    profiles: [apps]
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_MODE: live
+      GATEWAY_URL: http://gateway:8080
+      # Живой канал чата: браузер подключается к messaging напрямую (cookie localhost общие для портов)
+      REALTIME_URL: ws://localhost:8081/ws
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+    ports: ['3100:3000']
+    depends_on:
+      gateway: { condition: service_started }
+
+volumes:
+  pg-data:
+  valkey-data:
+  kafka-data:
+  opensearch-data:
+  clickhouse-data:
+  minio-data:

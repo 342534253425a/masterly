@@ -1,0 +1,60 @@
+# SLO-алерты по методике multi-window multi-burn-rate (Google SRE Workbook).
+# SLO доступности API — 99.95% за 30 дней → бюджет ошибок 0.05%.
+groups:
+  - name: slo-api-availability
+    rules:
+      - record: sli:http_errors:ratio_rate5m
+        expr: |
+          sum(rate(http_server_requests_total{service="gateway",code=~"5.."}[5m]))
+          / sum(rate(http_server_requests_total{service="gateway"}[5m]))
+      - record: sli:http_errors:ratio_rate1h
+        expr: |
+          sum(rate(http_server_requests_total{service="gateway",code=~"5.."}[1h]))
+          / sum(rate(http_server_requests_total{service="gateway"}[1h]))
+      - record: sli:http_errors:ratio_rate6h
+        expr: |
+          sum(rate(http_server_requests_total{service="gateway",code=~"5.."}[6h]))
+          / sum(rate(http_server_requests_total{service="gateway"}[6h]))
+      - alert: ApiErrorBudgetFastBurn
+        expr: sli:http_errors:ratio_rate1h > (14.4 * 0.0005) and sli:http_errors:ratio_rate5m > (14.4 * 0.0005)
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: 'Быстрое сжигание бюджета ошибок API (2% бюджета за час)'
+          runbook: docs/architecture/observability.md#runbooks
+      - alert: ApiErrorBudgetSlowBurn
+        expr: sli:http_errors:ratio_rate6h > (6 * 0.0005)
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: 'Медленное сжигание бюджета ошибок API (5% бюджета за 6 часов)'
+
+  - name: slo-search-latency
+    rules:
+      - alert: SearchLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service="gateway",route="/v1/search"}[5m]))) > 0.25
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: 'p95 поиска выше 250 мс — SLO под угрозой'
+
+  - name: kafka-and-outbox
+    rules:
+      - alert: KafkaConsumerLagHigh
+        expr: max by (group, topic) (kafka_consumergroup_lag) > 50000
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: 'Лаг consumer-группы {{ $labels.group }} по {{ $labels.topic }} растёт (KEDA уже должен масштабировать)'
+      - alert: OutboxBacklog
+        expr: max by (service) (outbox_pending_events) > 10000
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: 'Outbox сервиса {{ $labels.service }} не успевает публиковать события'
+      - alert: DlqNotEmpty
+        expr: sum by (topic) (increase(kafka_dlq_messages_total[15m])) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: 'Сообщения попали в DLQ {{ $labels.topic }}'

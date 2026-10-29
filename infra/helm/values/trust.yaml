@@ -1,0 +1,29 @@
+# Trust & Safety: модерация, дубликаты профилей, накрутка отзывов
+nameOverride: trust
+component: backend
+image:
+  repository: cr.yandex/masterly/trust
+ports:
+  grpc: 50060
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 12
+keda:
+  enabled: true
+  consumerGroup: trust
+  topics: [catalog.master.v1, reviews.review.v1, media.asset.v1]
+  maxReplicas: 24
+networkPolicy:
+  allowFrom: [gateway]
+migrations:
+  enabled: true

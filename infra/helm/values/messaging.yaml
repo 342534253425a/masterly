@@ -1,0 +1,40 @@
+# Messaging: диалоги и история сообщений (gRPC :50056) + живой канал чата (WebSocket :8081, wss://masterly.ru/ws).
+# Сигналы между подами — Redis Pub/Sub (REDIS_URL из Lockbox), вход — access-cookie, проверка JWT по JWKS identity.
+nameOverride: messaging
+component: backend
+image:
+  repository: cr.yandex/masterly/messaging
+ports:
+  grpc: 50056
+  http: 8081
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+  JWT_ISSUER: "https://id.masterly.ru"
+  WS_ALLOWED_ORIGINS: "https://masterly.ru,https://www.masterly.ru"
+resources:
+  requests: { cpu: 500m, memory: 512Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 4
+  maxReplicas: 40
+keda:
+  enabled: true
+  consumerGroup: messaging
+  topics: [leads.lead.v1]
+  maxReplicas: 48
+networkPolicy:
+  allowFromNamespaces: [gateway, observability]
+  allowFrom: [gateway]
+# Тот же хост, что у сайта: host-only cookie сессии уходит и в WebSocket. Таймаут маршрута выключен — соединения живут
+# до истечения токена (15 минут), сервер сам шлёт ping каждые 30 секунд
+httpRoute:
+  enabled: true
+  hostnames: [masterly.ru]
+  pathPrefix: /ws
+  requestTimeout: 0s
+migrations:
+  enabled: true

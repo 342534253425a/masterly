@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "title": "Masterly — smartphone repair: trusted local specialists",
+    "description": "Describe the problem and get matched with verified smartphone repair specialists in Moscow, Saint Petersburg and Krasnodar. Transparent prices, warranty, reviews. No commission."
+  },
+  "common": {
+    "skipToContent": "Skip to content",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "showAll": "View all",
+    "showMore": "Show more",
+    "free": "Free",
+    "priceFrom": "from {price}",
+    "masters": "{count, plural, one {# specialist} other {# specialists}}",
+    "reviews": "{count, plural, one {# review} other {# reviews}}",
+    "years": "{count, plural, one {# year} other {# years}}",
+    "demoBadge": "Demo mode",
+    "demoHint": "Generated data. Sign in as any role to explore the whole product."
+  },
+  "nav": {
+    "home": "Home",
+    "search": "Search & map",
+    "orders": "Requests",
+    "messages": "Messages",
+    "favorites": "Favorites",
+    "profile": "Profile",
+    "cabinet": "Specialist workspace",
+    "admin": "Admin panel",
+    "forMasters": "For specialists",
+    "help": "Help & warranty",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "notifications": "Notifications",
+    "newRequest": "New request",
+    "switchRole": "Demo: sign in as",
+    "roles": { "client": "Client", "master": "Specialist", "admin": "Administrator" }
+  },
+  "home": {
+    "titleStart": "Find trusted local specialists",
+    "titleAccent": "in minutes",
+    "subtitle": "Describe the problem in your own words — we match nearby specialists and show transparent prices, timing and warranty. No commission, no prepayment.",
+    "searchPlaceholder": "e.g. cracked iPhone 13 screen",
+    "searchCta": "Find a specialist",
+    "ai": {
+      "badge": "AI Assistant",
+      "title": "Describe your problem and get instant repair recommendations and transparent pricing",
+      "cta": "Get AI diagnosis",
+      "aside": "Smarter repairs start here"
+    },
+    "popular": "Popular services",
+    "topMasters": "Top specialists nearby"
+  },
+  "search": {
+    "title": "Smartphone repair specialists",
+    "understood": "We understood your request",
+    "ad": "Ad"
+  }
+}

@@ -1,0 +1,24 @@
+# Reviews: отзывы по завершённым заявкам, антифрод, рейтинги
+nameOverride: reviews
+component: backend
+image:
+  repository: cr.yandex/masterly/reviews
+ports:
+  grpc: 50055
+  http: 0
+env:
+  KAFKA_BROKERS: "rc1a-kafka.mdb.yandexcloud.net:9091"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  LOG_LEVEL: "info"
+  GRPC_IDENTITY: "dns:///identity-headless:50051"
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 512Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 16
+networkPolicy:
+  allowFrom: [gateway]
+migrations:
+  enabled: true

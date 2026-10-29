@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", "helpers:pinGitHubActionDigests"],
+  "timezone": "Europe/Moscow",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "7 days",
+  "rangeStrategy": "pin",
+  "packageRules": [
+    { "matchUpdateTypes": ["patch", "minor"], "matchCurrentVersion": "!/^0/", "automerge": true },
+    { "groupName": "nestjs", "matchPackageNames": ["@nestjs/**"] },
+    { "groupName": "storybook", "matchPackageNames": ["storybook", "@storybook/**"] },
+    { "groupName": "opentelemetry", "matchPackageNames": ["@opentelemetry/**"] },
+    { "groupName": "terraform providers", "matchManagers": ["terraform"] },
+    { "groupName": "docker images", "matchManagers": ["docker-compose", "dockerfile"] }
+  ],
+  "vulnerabilityAlerts": { "labels": ["security"], "automerge": false }
+}
